@@ -55,6 +55,7 @@ class DPLS:
 
         self.X = None
         self.y = None
+        self.fit_mode=None
 
         self.R2 = None
         self.cv_R2 = None
@@ -89,7 +90,17 @@ class DPLS:
         :param y: 因变量
         """
 
-        storager = {}
+        storager = {
+
+            "R2": None,
+            "p": None,
+            "p_arys": None,
+            "y_pred": None,
+            "y_preds": None,
+            "y_pred_R2": None,
+            "coef": None,
+
+        }
 
         # 防止最大迭代数超过距离矩阵列数
         if self.max_iter > X.shape[0]:
@@ -143,7 +154,7 @@ class DPLS:
                     p_ary = sum_P(P, self.max_iter, self.max_iter, y_train.shape[1])
 
                 else:
-                    raise NotImplementedError('eig_solver 的值仅限于pow或sklearn')
+                    raise AttributeError('eig_solver 的值仅限于pow或sklearn')
 
                 # 记录系数矩阵 p_ary
                 p_arys.append(p_ary)
@@ -155,19 +166,9 @@ class DPLS:
 
             print('非法的矩阵,PLSR奇异值分解过程不符合要求')
 
-            storager['R2'] = np.nan
-            storager['p'] = np.nan
-            storager['p_arys'] = np.nan
-            storager['coef'] = np.nan
-
-            storager['y_pred'] = np.nan
-            storager['y_preds'] =np.nan
-            storager['y_pred_R2'] = np.nan
-
             return storager
 
         else:
-
 
             if y.shape[1] == 1:
 
@@ -197,21 +198,21 @@ class DPLS:
         return storager
 
 
-    def _fit_rectify(self, X, y, fit_mode: Literal['CV', 'Fit', 'Fit_rectify'] = 'Fit_rectify', **kwargs):
+    def _fit_rectify(self, **kwargs):
 
         storager = {}
 
-        if fit_mode == 'CV':
+        if self.fit_mode == 'CV':
 
-            cv_stored = self._DPLS_PLS_core(X, y, self.cv)
+            cv_stored = self._DPLS_PLS_core(self.X, self.y, self.cv)
             storager.update(cv_stored.copy())
 
-        if fit_mode == 'Fit_rectify':
+        if self.fit_mode == 'Fit_rectify':
 
-            cv_stored = self._DPLS_PLS_core(X, y, self.cv)
+            cv_stored = self._DPLS_PLS_core(self.X, self.y, self.cv)
             storager.update(cv_stored.copy())
 
-            fit_stored = self._DPLS_PLS_core(X, y, cv=1)
+            fit_stored = self._DPLS_PLS_core(self.X, self.y, cv=1)
 
             if fit_stored["R2"] is np.nan:
 
@@ -242,7 +243,7 @@ class DPLS:
 
             # Fit_R2P = 1/(1+np.exp(-1*(m[file_values.shape[1]-1][0])*(P/file_values.shape[0] - (m[file_values.shape[1]-1][1]))))
             try:
-                Fit_R2P = 1 / (1 + np.exp(-1 * (m[X.shape[1] - 1][0]) * (np.log(P / X.shape[0]) - (m[X.shape[1] - 1][1]))))
+                Fit_R2P = 1 / (1 + np.exp(-1 * (m[self.X.shape[1] - 1][0]) * (np.log(P / self.X.shape[0]) - (m[self.X.shape[1] - 1][1]))))
 
             except IndexError:
 
@@ -270,7 +271,7 @@ class DPLS:
             Each_R2P = fit_pred_R2 / Fit_R2P
 
             cv_pred_R2 = cv_stored['y_pred_R2']
-            cv_floor = P * (1 / (int(X.shape[0] ** 0.6) * X.shape[1]))
+            cv_floor = P * (1 / (int(self.X.shape[0] ** 0.6) * self.X.shape[1]))
             cv_use = cv_pred_R2 > cv_floor
 
             p_df = pd.DataFrame({'cv_use': cv_use, 'cv_pred_R2': cv_pred_R2})
@@ -337,9 +338,9 @@ class DPLS:
             storager['y_pred'] = fit_y_preds[:, fit_P].reshape(-1, 1)
             storager['y_pred_R2'] = fit_pred_R2
 
-        elif fit_mode == 'Fit':
+        elif self.fit_mode == 'Fit':
 
-            fit_stored = self._DPLS_PLS_core(X, y, cv=1)
+            fit_stored = self._DPLS_PLS_core(self.X, self.y, cv=1)
 
             if np.any(np.isnan(fit_stored['R2'])):
                 return fit_stored
@@ -361,7 +362,7 @@ class DPLS:
             m = [m1, m2, m3, m4, m5]  # lame!
 
             try:
-                Fit_R2P = 1 / (1 + np.exp(-1 * (m[X.shape[1] - 1][0]) * (np.log(P / X.shape[0]) - (m[X.shape[1] - 1][1]))))
+                Fit_R2P = 1 / (1 + np.exp(-1 * (m[self.X.shape[1] - 1][0]) * (np.log(P / self.X.shape[0]) - (m[self.X.shape[1] - 1][1]))))
 
             except IndexError:
 
@@ -470,14 +471,13 @@ class DPLS:
         return self
 
 
-    def fit(self, X, y, fit_mode: Literal['CV', 'Fit', 'Fit_rectify'] = 'Fit_rectify', **kwargs):
+    def fit(self, X, y, fit_mode: Literal['CV', 'Fit', 'Fit_rectify'] = 'Fit_rectify',intercept=False, **kwargs):
 
         X = test_tools_v312.to_2D_ary(X)
         y = test_tools_v312.to_2D_ary(y)
 
         if self.whiten:
             X = test_tools_v312.stdize(X)
-            y = test_tools_v312.stdize(y)
 
         self.X = X
         self.y = y
