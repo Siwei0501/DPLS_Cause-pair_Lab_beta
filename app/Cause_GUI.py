@@ -1,44 +1,38 @@
 import copy
-
-import numpy as np
-import streamlit as st
-import pandas as pd
+import glob
+import importlib.util
+import io
+import json
 import os
 import sys
-import io
-from typing import Literal, Union, Tuple
 import time
-from typing import Callable
-from joblib import Parallel, delayed
-
-from stqdm import stqdm
-import importlib.util
-from sklearn.linear_model import LogisticRegression
-from sklearn.tree import DecisionTreeClassifier
-from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier, VotingClassifier, StackingClassifier
-from sklearn.svm import SVC
-from sklearn.neighbors import KNeighborsClassifier
-from sklearn.naive_bayes import GaussianNB
-from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
-from sklearn.metrics import accuracy_score
-from sklearn.model_selection import GridSearchCV
-import zipfile
-import json
-import glob
 import traceback
 import webbrowser
+import zipfile
+from typing import Callable
+from typing import Literal, Union
+
+import numpy as np
+import pandas as pd
 import plotly.express as px
-import kaleido
-import plotly.io as pio
-import random
-import re
+import streamlit as st
+from joblib import Parallel, delayed
+from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import accuracy_score
+from sklearn.model_selection import GridSearchCV
+from sklearn.naive_bayes import GaussianNB
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.svm import SVC
+from sklearn.tree import DecisionTreeClassifier
+from stqdm import stqdm
 
 # 导入自定义模块
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from cause_pair_functions.casual_pair_tester import process, algorithms, return_values_DF
 from cause_pair_functions.muti_func_test import gen_y_exp
 from cause_pair_functions.DPLS_jj import DPLS
-from cause_pair_functions.test_tools_v312 import stdize
 
 # 0 设置与定义------------------------------------------------------------------------------------------------------------
 
@@ -1353,6 +1347,13 @@ DPLSR_param_dict = {
         "options": ["Fit", 'CV', 'Fit_rectify'],
         "value": "Fit_rectify"
     },
+
+    "fit_intercept": {
+        "type": "checkbox",
+        "label": "截距项",
+        "value": False
+    },
+
     "whiten": {
         "type": "checkbox",
         "label": "标准化",
@@ -2500,16 +2501,13 @@ if use_data_type == use_data_options[0]:
                 st.session_state['x_picked_eg'] = x_picked_eg
                 st.session_state['eg_created'] = True
 
-                print("eg_created")
-
             else:
-                print("run_check_kwargs")
+
                 eg_change = (st.session_state["create_eg_kwargs"] != create_kwargs)
                 create_eg_kwargs = copy.deepcopy(create_kwargs)
                 st.session_state["create_eg_kwargs"] = create_eg_kwargs
 
                 if eg_change:
-                    print("eg_changed")
 
                     x_eg, X_eg, y_exp_eg, x_picked_eg = gen_y_exp(**create_eg_kwargs, sample_num=eg_create_samples)
 
@@ -2752,6 +2750,7 @@ if use_data_type == use_data_options[0]:
                     x_eg_use_i = pd.DataFrame()
 
                     x_eg_use_i[x_i] = pred_obj.X.copy()[:, x]
+
                     x_eg_use_i['y'] = y_df_eg['y_obs']
                     x_eg_use_i['preds'] = y_pred  # 使用完整预测值
 

@@ -55,7 +55,9 @@ class DPLS:
 
         self.X = None
         self.y = None
+
         self.fit_mode=None
+        self.fit_intercept=None
 
         self.R2 = None
         self.cv_R2 = None
@@ -102,9 +104,14 @@ class DPLS:
 
         }
 
+        if self.fit_intercept:
+
+            X = np.insert(X, 0, 1, axis=1)
+
         # 防止最大迭代数超过距离矩阵列数
         if self.max_iter > X.shape[0]:
             self.max_iter = X.shape[0]
+
 
         # X_ 训练集测试集索引
         train_list, test_list = spliter(X.shape[0], cv=cv)
@@ -139,6 +146,8 @@ class DPLS:
                     distance_train = X_train
                     distance_test = X_test
 
+                distance_train_mean = np.mean(distance_train, axis=0)
+
                 if self.eig_solver == 'pow':
 
                     # 求 P,e,r 分别为 迭代系数矩阵, 残差, PLS收敛的迭代层数
@@ -156,11 +165,14 @@ class DPLS:
                 else:
                     raise AttributeError('eig_solver 的值仅限于pow或sklearn')
 
+                # if self.whiten:
+                #     p_ary = p_ary / distance_train_std.reshape(-1,1)
+
                 # 记录系数矩阵 p_ary
                 p_arys.append(p_ary)
 
                 # 计算第i折的 y_pred
-                y_preds[test_list[i], :] = (distance_test - np.mean(distance_test, axis=0)) @ p_ary
+                y_preds[test_list[i], :] = (distance_test - distance_train_mean) @ p_ary + np.mean(y_train)
 
         except ValueError:
 
@@ -198,18 +210,18 @@ class DPLS:
         return storager
 
 
-    def _fit_rectify(self, **kwargs):
+    def _fit_rectify(self, X, y, **kwargs):
 
         storager = {}
 
         if self.fit_mode == 'CV':
 
-            cv_stored = self._DPLS_PLS_core(self.X, self.y, self.cv)
+            cv_stored = self._DPLS_PLS_core(X, y, self.cv)
             storager.update(cv_stored.copy())
 
         else:
 
-            fit_stored = self._DPLS_PLS_core(self.X, self.y, cv=1)
+            fit_stored = self._DPLS_PLS_core(X, y, cv=1)
             fit_pred_R2 = fit_stored['y_pred_R2']
             fit_y_preds = fit_stored['y_preds']
 
@@ -237,7 +249,7 @@ class DPLS:
 
             try:
                 Fit_R2P = 1 / (1 + np.exp(
-                    -1 * (m[self.X.shape[1] - 1][0]) * (np.log(P / self.X.shape[0]) - (m[self.X.shape[1] - 1][1]))))
+                    -1 * (m[X.shape[1] - 1][0]) * (np.log(P /X.shape[0]) - (m[X.shape[1] - 1][1]))))
 
             except IndexError:
 
@@ -250,12 +262,12 @@ class DPLS:
                 # 'Fit_rectify': Fit 矫正模式
 
                 # 1: 先求出 cv 结果
-                cv_stored = self._DPLS_PLS_core(self.X, self.y, self.cv)
+                cv_stored = self._DPLS_PLS_core(X, y, self.cv)
                 storager.update(cv_stored.copy())
 
                 # 2: 选出 cv 中哪些至少大于 cv_floor 的 P
                 cv_pred_R2 = cv_stored['y_pred_R2']
-                cv_floor = P * (1 / (int(self.X.shape[0] ** 0.6) * self.X.shape[1]))
+                cv_floor = P * (1 / (int(X.shape[0] ** 0.6) * X.shape[1]))
                 cv_use = cv_pred_R2 > cv_floor
 
                 #
@@ -275,7 +287,7 @@ class DPLS:
 
             elif self.fit_mode == 'Fit':
 
-                fit_stored = self._DPLS_PLS_core(self.X, self.y, cv=1)
+                fit_stored = self._DPLS_PLS_core(X, y, cv=1)
 
                 if fit_stored['y_pred_R2'] is None:
                     return fit_stored
@@ -301,7 +313,6 @@ class DPLS:
             storager['y_preds'] = fit_y_preds
             storager['y_pred'] = fit_y_preds[:, fit_P].reshape(-1, 1)
             storager['y_pred_R2'] = fit_pred_R2
-
 
         return storager
 
@@ -370,12 +381,12 @@ class DPLS:
                               leave=True,
                               ncols=88,
                               colour='white', disable=not self.bar):
-                    data_i = self._fit_rectify(X=self.X[:, i].reshape(-1, 1), y=self.y, fit_mode=self.fit_mode, **kwargs)
+                    data_i = self._fit_rectify(X=self.X[:, i].reshape(-1, 1), y=self.y, **kwargs)
                     stored_data.append(data_i)
 
             else:
                 stored_data = Parallel(n_jobs=1)(
-                    delayed(self._fit_rectify)(X=self.X[:, i].reshape(-1, 1), y=self.y, fit_mode=self.fit_mode, **kwargs) for i
+                    delayed(self._fit_rectify)(X=self.X[:, i].reshape(-1, 1), y=self.y,  **kwargs) for i
                     in range(self.X.shape[1]))
                 # n_jobs暂时固定为1, 多线程显示有不能打包的参数 (可能存在循环引用问题?)
 
@@ -389,18 +400,25 @@ class DPLS:
         return self
 
 
-    def fit(self, X, y, fit_mode: Literal['CV', 'Fit', 'Fit_rectify'] = 'Fit_rectify', intercept=False, **kwargs):
+    def fit(self, X, y, fit_mode: Literal['CV', 'Fit', 'Fit_rectify'] = 'Fit_rectify', fit_intercept=False, **kwargs):
 
         X = test_tools_v312.to_2D_ary(X)
         y = test_tools_v312.to_2D_ary(y)
 
+        self.fit_mode = fit_mode
+
         if self.whiten:
             X = test_tools_v312.stdize(X)
+
+        # 截距项
+        if fit_intercept:
+
+            self.fit_intercept = True
 
         self.X = X
         self.y = y
 
-        return self._fit(X=X, y=y, fit_mode=fit_mode, **kwargs)
+        return self._fit(**kwargs)
 
 
     def fit_transform(self, X, y, fit_mode: Literal['CV', 'Fit', 'Fit_rectify'] = 'Fit', **kwargs):
