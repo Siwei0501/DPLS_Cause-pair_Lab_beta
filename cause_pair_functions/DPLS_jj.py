@@ -207,19 +207,14 @@ class DPLS:
             cv_stored = self._DPLS_PLS_core(self.X, self.y, self.cv)
             storager.update(cv_stored.copy())
 
-        if self.fit_mode == 'Fit_rectify':
-
-            cv_stored = self._DPLS_PLS_core(self.X, self.y, self.cv)
-            storager.update(cv_stored.copy())
+        else:
 
             fit_stored = self._DPLS_PLS_core(self.X, self.y, cv=1)
-
-            if fit_stored["R2"] is np.nan:
-
-                return fit_stored
-
             fit_pred_R2 = fit_stored['y_pred_R2']
             fit_y_preds = fit_stored['y_preds']
+
+            if fit_stored['y_pred_R2'] is None:
+                return fit_stored
 
             P = np.arange(1, self.max_iter + 1)
 
@@ -231,7 +226,8 @@ class DPLS:
             m3 = [2.99084683, -3.1657871, 0.981389]
             m4 = [2.44274849, -3.164627, 0.985082]
             m5 = [2.227481, -3.2405129, 0.980818]
-            #
+            m = [m1, m2, m3, m4, m5]  # lame!
+
             # # 0.01
             # m1 = [2.20217881, -2.48587620, 0.984505]
             # m2 = [2.95998001, -3.03071600, 0.981375]
@@ -239,137 +235,59 @@ class DPLS:
             # m4 = [2.45126029, -3.25310720, 0.985082]
             # m5 = [2.23458811, -3.34167600, 0.980818]
 
-            m = [m1, m2, m3, m4, m5]  # lame!
-
-            # Fit_R2P = 1/(1+np.exp(-1*(m[file_values.shape[1]-1][0])*(P/file_values.shape[0] - (m[file_values.shape[1]-1][1]))))
             try:
-                Fit_R2P = 1 / (1 + np.exp(-1 * (m[self.X.shape[1] - 1][0]) * (np.log(P / self.X.shape[0]) - (m[self.X.shape[1] - 1][1]))))
-
-            except IndexError:
-
-                raise IndexError('Fit 模式暂不支持5阶以上, 即自变量超过5个以上的数据, 继续分析请调整至CV模式')
-            # Fit_R2P = (441.863117*24.915459*np.exp(0.05681148*P) / (441.863117 + 24.915459*(np.exp(0.05681148*P) - 1))) / file_values.shape[0]
-
-            # cv_pred_R2 = cv_stored['y_pred_R2']
-            # cv_pred_R2_ = []
-            # for n in range(self.max_iter-4):
-            #     cv_pred_R2_.append(np.mean(cv_pred_R2[n:n+4]))
-            # cv_pred_R2_ = np.array(cv_pred_R2_)
-            # Each_R2P = cv_pred_R2_
-
-            # Fit_R2P_ = np.insert(Fit_R2P[:-1], 0, 0
-            # fit_pred_R2_ = np.insert(fit_pred_R2[:-1], 0, 0)
-            # Each_R2P = fit_pred_R2 - Fit_R2P
-            # Each_R2P = (fit_pred_R2 - fit_pred_R2_) > (Fit_R2P - Fit_R2P_)  # δ_fit > δ_logistic
-            # fit_P=0
-            # for n in range(self.max_iter-1):
-            #     if Each_R2P[n] > Each_R2P[n+1]:
-            #         fit_P = n
-            #         break
-
-            # Each_R2P = (fit_pred_R2 - fit_pred_R2_) > (Fit_R2P - Fit_R2P_) * (-20*fit_pred_R2 + 21)  # δ_fit > δ_logistic * (-20*fit_R + 21),  ← cv_P
-            Each_R2P = fit_pred_R2 / Fit_R2P
-
-            cv_pred_R2 = cv_stored['y_pred_R2']
-            cv_floor = P * (1 / (int(self.X.shape[0] ** 0.6) * self.X.shape[1]))
-            cv_use = cv_pred_R2 > cv_floor
-
-            p_df = pd.DataFrame({'cv_use': cv_use, 'cv_pred_R2': cv_pred_R2})
-            largest_10p = list(p_df.loc[p_df['cv_use']].sort_values(by='cv_pred_R2', ascending=False).index[:5])
-            # Each_R2P_minus = fit_pred_R2 - Fit_R2P
-            # Each_R2P_prod = fit_pred_R2 / Fit_R2P
-            #
-            # Each_R2P_minus = Each_R2P_minus.argsort().argsort()
-            # Each_R2P_prod = Each_R2P_prod.argsort().argsort() * (3/file_values.shape[1])
-            # Each_R2P = Each_R2P_minus + Each_R2P_prod
-
-            # fig = plt.figure()
-            # plt.scatter(P, fit_pred_R2, color='blue', label='fit', alpha=0.5, marker='o',
-            #             s=15)
-            # plt.scatter(P, Fit_R2P, color='black', label='0.01pred', alpha=0.5, marker='o',
-            #             s=15)
-            # plt.scatter(P, Each_R2P, color='red', label='fit-0.01pred', alpha=0.5, marker='o',
-            #             s=15)
-            # cv_plus_p = cv_stored['p'] + 10
-            # if cv_plus_p > self.max_iter:
-            #     cv_plus_p = self.max_iter-1
-
-            # Each_R2P = Each_R2P[:cv_stored['p']+1] # ← CV
-
-            Each_R2P = [Each_R2P[cv_p] for cv_p in largest_10p]  # ← CV
-
-            try:
-                fit_P = largest_10p[np.argmax(Each_R2P)]
-
-            except ValueError:
-                fit_P = 0
-            except TypeError:
-                fit_P = 0
-            # fit_P = np.where(Each_R2P)[0][-1] if Each_R2P.any() else cv_stored['p']
-
-            # for n in range(cv_stored['p'], 0, -1):  # 从最后一位开始, 倒序遍历
-            #     if (fit_pred_R2[n] - fit_pred_R2[n - 1]) > (16 - 15 * fit_pred_R2[n - 1]) / file_values.shape[0]:
-            #         fit_P = n
-            #         break
-
-            # for n in range(cv_stored['p'], 0, -1):  # 从最后一位开始, 倒序遍历
-            #     if (fit_pred_R2[n] - fit_pred_R2[n - 1]) > (16 - 15 * fit_pred_R2[n - 1]) / file_values.shape[0]:
-            #         fit_P = n
-            #         break
-
-            # # Fit_R2P = (464.827202 * 34.3845124 * np.exp(0.05428937 * P) / (464.827202 + 34.3845124 * (np.exp(0.05428937 * P) - 1))) / file_values.shape[0]
-            # # Fit_R2P = (fit_pred_R2 - np.array(Zero_p['AVERAGE'])[:self.max_iter])
-            # # Each_R2P = Fit_R2P / fit_pred_R2
-            #
-            # # Mean_R2P_56 = (1/file_values.shape[0]) * np.power(P, 1.39435942)
-            # # Each_R2P_56 = fit_pred_R2 / Mean_R2P_56
-            # # Each_R2P[:46] = Each_R2P_56[:46]
-            #
-            # fit_P = np.argmax(Each_R2P)+2
-            fit_R2 = fit_pred_R2[fit_P]
-            storager['R2'] = fit_R2
-            storager['p'] = fit_P
-            storager['coef'] = fit_stored['p_arys'][0][:, fit_P].reshape(-1, 1)
-
-            storager['fit_p'] = fit_P
-            storager['fit_R2'] = fit_R2
-
-            storager['y_preds'] = fit_y_preds
-            storager['y_pred'] = fit_y_preds[:, fit_P].reshape(-1, 1)
-            storager['y_pred_R2'] = fit_pred_R2
-
-        elif self.fit_mode == 'Fit':
-
-            fit_stored = self._DPLS_PLS_core(self.X, self.y, cv=1)
-
-            if np.any(np.isnan(fit_stored['R2'])):
-                return fit_stored
-
-            fit_pred_R2 = fit_stored['y_pred_R2']
-            fit_y_preds = fit_stored['y_preds']
-
-            P = np.arange(1, self.max_iter + 1)
-
-            # 好美的调试 ----------------------------------------------------------------------------------------------------------
-
-            # average
-            m1 = [2.21169467, -2.3817057, 0.984505]
-            m2 = [3.02072028, -2.9587557, 0.981375]
-            m3 = [2.99084683, -3.1657871, 0.981389]
-            m4 = [2.44274849, -3.164627, 0.985082]
-            m5 = [2.227481, -3.2405129, 0.980818]
-
-            m = [m1, m2, m3, m4, m5]  # lame!
-
-            try:
-                Fit_R2P = 1 / (1 + np.exp(-1 * (m[self.X.shape[1] - 1][0]) * (np.log(P / self.X.shape[0]) - (m[self.X.shape[1] - 1][1]))))
+                Fit_R2P = 1 / (1 + np.exp(
+                    -1 * (m[self.X.shape[1] - 1][0]) * (np.log(P / self.X.shape[0]) - (m[self.X.shape[1] - 1][1]))))
 
             except IndexError:
 
                 raise IndexError('Fit 模式暂不支持5阶以上, 即自变量超过5个以上的数据, 继续分析请调整至CV模式')
 
             Each_R2P = fit_pred_R2 / Fit_R2P
-            fit_P = np.argmax(Each_R2P)
+
+            if self.fit_mode == 'Fit_rectify':
+
+                # 'Fit_rectify': Fit 矫正模式
+
+                # 1: 先求出 cv 结果
+                cv_stored = self._DPLS_PLS_core(self.X, self.y, self.cv)
+                storager.update(cv_stored.copy())
+
+                # 2: 选出 cv 中哪些至少大于 cv_floor 的 P
+                cv_pred_R2 = cv_stored['y_pred_R2']
+                cv_floor = P * (1 / (int(self.X.shape[0] ** 0.6) * self.X.shape[1]))
+                cv_use = cv_pred_R2 > cv_floor
+
+                #
+                p_df = pd.DataFrame({'cv_use': cv_use, 'cv_pred_R2': cv_pred_R2})
+                largest_10p = list(p_df.loc[p_df['cv_use']].sort_values(by='cv_pred_R2', ascending=False).index[:5])
+
+                Each_R2P = [Each_R2P[cv_p] for cv_p in largest_10p]  # ← CV
+
+                try:
+                    fit_P = largest_10p[np.argmax(Each_R2P)]
+
+                except ValueError:
+                    fit_P = 0
+                except TypeError:
+                    fit_P = 0
+
+
+            elif self.fit_mode == 'Fit':
+
+                fit_stored = self._DPLS_PLS_core(self.X, self.y, cv=1)
+
+                if fit_stored['y_pred_R2'] is None:
+                    return fit_stored
+
+                fit_pred_R2 = fit_stored['y_pred_R2']
+                fit_y_preds = fit_stored['y_preds']
+
+                fit_P = np.argmax(Each_R2P)
+
+
+            else:
+                raise AttributeError(f"Do not understand param of fit_mode: {self.fit_mode} ")
 
             fit_R2 = fit_pred_R2[fit_P]
 
@@ -423,7 +341,7 @@ class DPLS:
         return result_dict
 
 
-    def _fit(self, X, y, fit_mode: Literal['CV', 'Fit', 'Fit_rectify'] = 'Fit_rectify', **kwargs):
+    def _fit(self, **kwargs):
 
         """
 
@@ -441,24 +359,24 @@ class DPLS:
 
         if self.R_mode == 'fusion':
 
-            stored_data = [self._fit_rectify(X=X, y=y, fit_mode=fit_mode, **kwargs)]
+            stored_data = [self._fit_rectify(X=self.X, y=self.y, fit_mode=self.fit_mode, **kwargs)]
 
         elif self.R_mode == 'single':
 
             if self.n_jobs == 1:
                 stored_data = []
 
-                for i in tqdm(range(X.shape[1]), desc=f"DPLS_single",
+                for i in tqdm(range(self.X.shape[1]), desc=f"DPLS_single",
                               leave=True,
                               ncols=88,
                               colour='white', disable=not self.bar):
-                    data_i = self._fit_rectify(X=X[:, i].reshape(-1, 1), y=y, fit_mode=fit_mode, **kwargs)
+                    data_i = self._fit_rectify(X=self.X[:, i].reshape(-1, 1), y=self.y, fit_mode=self.fit_mode, **kwargs)
                     stored_data.append(data_i)
 
             else:
                 stored_data = Parallel(n_jobs=1)(
-                    delayed(self._fit_rectify)(X=X[:, i].reshape(-1, 1), y=y, fit_mode=fit_mode, **kwargs) for i
-                    in range(X.shape[1]))
+                    delayed(self._fit_rectify)(X=self.X[:, i].reshape(-1, 1), y=self.y, fit_mode=self.fit_mode, **kwargs) for i
+                    in range(self.X.shape[1]))
                 # n_jobs暂时固定为1, 多线程显示有不能打包的参数 (可能存在循环引用问题?)
 
         else:
@@ -471,7 +389,7 @@ class DPLS:
         return self
 
 
-    def fit(self, X, y, fit_mode: Literal['CV', 'Fit', 'Fit_rectify'] = 'Fit_rectify',intercept=False, **kwargs):
+    def fit(self, X, y, fit_mode: Literal['CV', 'Fit', 'Fit_rectify'] = 'Fit_rectify', intercept=False, **kwargs):
 
         X = test_tools_v312.to_2D_ary(X)
         y = test_tools_v312.to_2D_ary(y)
