@@ -2625,7 +2625,7 @@ if use_data_type == use_data_options[0]:
 
         st.markdown("")
         st.markdown("")
-        create_Formula_panel_1, create_Formula_sep_1, create_Formula_panel_2 = st.columns([.738,0.018, .23])
+        create_Formula_panel_1, create_Formula_sep_1, create_Formula_panel_2 = st.columns([.65,0.018, .35])
 
         # 独立与互作特征鉴别器(待升级)
         def count_unique_ai(expr: str, list_a: list) -> int:
