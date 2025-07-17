@@ -36,30 +36,6 @@ from cause_pair_functions.DPLS_jj import DPLS
 
 # 0 设置与定义------------------------------------------------------------------------------------------------------------
 
-
-# 0-1 设置网页宽度与缩放比例
-st.markdown("""
-<style>
-/* 让主内容区域占满整个可视高度并禁止滚动 */
-section.main > div {
-    height: 100vh !important;
-}
-</style>
-""", unsafe_allow_html=True)
-
-st.markdown("""
-<style>
-/* 设置整个 Streamlit 页面最小宽度为 4800px */
-@media screen and (max-width: 4800px) {
-    .main, .block-container {
-        min-width: 2000px !important;
-        overflow-x: auto !important;
-    }
-}
-
-</style>
-""", unsafe_allow_html=True)
-
 st.markdown("""
 <style>
 /* 将整个内容区域整体往上移动 65px */
@@ -934,8 +910,8 @@ st.markdown("""
 # 1 定义主内容区 ---------------------------------------------------------------------------------------------------------
 
 
-host_panel_sep1, host_panel_detail, host_panel_sep_2, host_panel_setting, host_panel_sep3, host_config_panel, host_panel_sep4 = st.columns(
-    [0.013, .666, 0.013, .185, 0.007, .135, 0.01])
+host_panel_detail, host_panel_sep_2, host_panel_setting, host_panel_sep3, host_config_panel= st.columns(
+    [.666, 0.013, .185, 0.007, .135])
 
 # host_panel_detail: 详细信息区
 # host_panel_setting: 样本设置区
@@ -2046,7 +2022,7 @@ if use_data_type == use_data_options[0]:
 
     # 7-2-3 定义生成模拟数据的控制面板 ---------------------------------------------------------------------------------------
 
-    create_sep2, create_preview_panel, create_sep1, create_control_panel, create_sep3, create_runinfo_panel, create_sep4 = st.columns([0.013, .666, 0.013, .185, 0.007, .135, 0.010])
+    create_preview_panel, create_sep1, create_control_panel, create_sep3, create_runinfo_panel = st.columns([.666, 0.013, .185, 0.007, .135,])
 
     with create_control_panel:
 
@@ -2293,35 +2269,6 @@ if use_data_type == use_data_options[0]:
                 create_linear_coef_range = st.slider("线性函数系数范围", -10, 10, (-3, 3), key="create_linear_coef_range", step=1)
 
 
-                create_x_bank = st.multiselect(label="可出现的f(x):", options=["All"] + list(function_dict.keys()),
-                                               default=["线性函数", "正弦函数", "二次函数"], key="create_x_bank",
-                                               help=
-               "'正弦函数': f'sin(πx)',  \n"
-               "'余弦函数': f'cos(πx)'  \n"
-               "'二次函数': f'2(x)^2',  \n"
-                "'平方根函数': f'sqrt(x)',  \n"
-                "'指数函数': f'e^x',  \n"
-                "'对数函数（平移）': f'log(x+1)',  \n"
-                "'对数函数（加偏移防负值）': f'log(x)',  \n"
-                "'Sigmoid 函数': f'1/(1+e^-6x)',  \n"
-                "'三次多项式函数': f'2x^3+x^2-2x',  \n"
-                "'指数幂函数': f'2^5(x+1)',  \n"
-                "'高频正弦函数': f'sin(2πx)',  \n"
-                "'混合三角+线性函数': f'1/5×sin(4x)+(11/10)×x',  \n"
-                "'高频正弦 + 线性项': f'sin(5πx)+x',  \n"
-                "'高频余弦函数': f'cos(6πx)',  \n"
-                "'高频正弦线性混合函数': f'1/10×sin(10.6×f)+(11/10)×x',  \n"
-                "'非线性频率余弦函数': f'cos(5πx(x+1))',  \n"
-                "'非线性频率正弦函数': f'sin(4πx(x+1))'  \n"
-                )
-
-                if "All" in create_x_bank:
-                    create_x_bank = list(function_dict.keys())
-
-                if not create_x_bank:
-                    create_x_bank = ["正弦函数"]
-
-
             with create_linear_intercept_col:
                 create_redun_slope = st.slider("X的冗余倾向 ⚠️", min_value=1.0, max_value=8.0, step=0.5, value=2.5,
                                                   key="create_redun_slope",
@@ -2331,12 +2278,41 @@ if use_data_type == use_data_options[0]:
                                                   )
                 create_linear_intercept_range = st.slider("线性函数截距范围", -25, 25, (-5, 5), key='create_linear_intercept_range', step=2)
 
-                create_xtox_bank = st.multiselect(label="可出现的互作函数:", options=["All"] + list(xtox_func_dict.keys()),
-                                               default=["积函数", "绝对值和函数", "正弦和函数"], key="create_xtox_bank")
+            create_x_bank = st.multiselect(label="可出现的f(x):", options=["All"] + list(function_dict.keys()),
+                                           default=["线性函数", "正弦函数", "二次函数"], key="create_x_bank",
+                                           help=
+                                           "'正弦函数': f'sin(πx)',  \n"
+                                           "'余弦函数': f'cos(πx)'  \n"
+                                           "'二次函数': f'2(x)^2',  \n"
+                                           "'平方根函数': f'sqrt(x)',  \n"
+                                           "'指数函数': f'e^x',  \n"
+                                           "'对数函数（平移）': f'log(x+1)',  \n"
+                                           "'对数函数（加偏移防负值）': f'log(x)',  \n"
+                                           "'Sigmoid 函数': f'1/(1+e^-6x)',  \n"
+                                           "'三次多项式函数': f'2x^3+x^2-2x',  \n"
+                                           "'指数幂函数': f'2^5(x+1)',  \n"
+                                           "'高频正弦函数': f'sin(2πx)',  \n"
+                                           "'混合三角+线性函数': f'1/5×sin(4x)+(11/10)×x',  \n"
+                                           "'高频正弦 + 线性项': f'sin(5πx)+x',  \n"
+                                           "'高频余弦函数': f'cos(6πx)',  \n"
+                                           "'高频正弦线性混合函数': f'1/10×sin(10.6×f)+(11/10)×x',  \n"
+                                           "'非线性频率余弦函数': f'cos(5πx(x+1))',  \n"
+                                           "'非线性频率正弦函数': f'sin(4πx(x+1))'  \n"
+                                           )
 
-                if "All" in create_xtox_bank:
+            if "All" in create_x_bank:
+                create_x_bank = list(function_dict.keys())
 
-                    create_xtox_bank = list(xtox_func_dict.keys())
+            if not create_x_bank:
+                create_x_bank = ["正弦函数"]
+
+
+            create_xtox_bank = st.multiselect(label="可出现的互作函数:", options=["All"] + list(xtox_func_dict.keys()),
+                                              default=["积函数", "绝对值和函数", "正弦和函数"], key="create_xtox_bank")
+
+            if "All" in create_xtox_bank:
+                create_xtox_bank = list(xtox_func_dict.keys())
+
 
             create_define = st.slider("定义域", -5.0, 5.0, (-1.0, 1.0), key="create_define", step=0.1)
 
@@ -2649,7 +2625,7 @@ if use_data_type == use_data_options[0]:
 
         st.markdown("")
         st.markdown("")
-        create_Formula_panel_1, create_Formula_sep_1, create_Formula_panel_2 = st.columns([.738,0.018, .23])
+        create_Formula_panel_1, create_Formula_sep_1, create_Formula_panel_2 = st.columns([.65,0.018, .35])
 
         # 独立与互作特征鉴别器(待升级)
         def count_unique_ai(expr: str, list_a: list) -> int:
@@ -2728,6 +2704,8 @@ if use_data_type == use_data_options[0]:
 
                 st.markdown("---")
 
+                blue_print = st.selectbox('切换打印的 y', options=['y_obs', 'y_exp'])
+
                 with st.spinner("正在拟合..."):
 
                     pred_obj = DPLS(**DPLS_kwargs["DPLSR"]).fit(x_eg_use.copy(), y_df_eg['y_obs'].copy(),
@@ -2751,7 +2729,14 @@ if use_data_type == use_data_options[0]:
 
                     x_eg_use_i[x_i] = pred_obj.X.copy()[:, x]
 
-                    x_eg_use_i['y'] = y_df_eg['y_obs']
+                    if blue_print == 'y_obs':
+
+                        x_eg_use_i['y'] = y_df_eg['y_obs']
+
+                    else:
+
+                        x_eg_use_i['y'] = y_df_eg['y_exp']
+
                     x_eg_use_i['preds'] = y_pred  # 使用完整预测值
 
                     # 创建基础散点图（x_i vs y，蓝色）
