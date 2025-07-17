@@ -626,7 +626,7 @@ st.markdown("""
 /* 标题容器整体上移 */
 .custom-title-container {
     position: relative;
-    top: -43px;
+    top: -23px;
     left: 35px;
     margin-bottom: 10px;
     margin-top: 25px;
@@ -2646,7 +2646,6 @@ if use_data_type == use_data_options[0]:
 
             # 使用 expander 创建一个可折叠/展开的区域
             DPLSR_param_dict_ = DPLSR_param_dict.copy()
-            # DPLSR_param_dict_["R_mode"]={"type": "selectbox", "label": "求R模式, [fusion]: 返回整个样本集的DPLSR, [single]: 返回每列的DPLSR","options": ['fusion', 'single'], "value": 'single'}
             DPLS_kwargs = param_controller(
                 param_list=['DPLSR'],
                 para_descriptions={'DPLSR': method_descriptions.get('DPLSR')},
@@ -2704,7 +2703,8 @@ if use_data_type == use_data_options[0]:
 
                 st.markdown("---")
 
-                blue_print = st.selectbox('切换打印的 y', options=['y_obs', 'y_exp'])
+                blue_print = st.selectbox('切换打印的 y', options=['y_obs', 'y_exp'], key='blue_print')
+                enforce_P = st.slider("硬指派的 P: ", min_value=-1, max_value=DPLS_kwargs['DPLSR']['max_iter']-1, value=-1, key='enforce_P')
 
                 with st.spinner("正在拟合..."):
 
@@ -2715,15 +2715,36 @@ if use_data_type == use_data_options[0]:
 
                     x = list(x_eg_use.columns).index(x_i)
 
-                    if DPLS_kwargs["DPLSR"]["R_mode"] == 'single':
+                    if enforce_P == -1:
 
-                        y_pred = pred_obj.y_pred[x]
-                        R = pred_obj.R2[x]
+                        if DPLS_kwargs["DPLSR"]["R_mode"] == 'single':
+
+                            y_pred = pred_obj.y_pred[x]
+                            print("y_pred:", y_pred.shape)
+
+                            R = pred_obj.R2[x]
+                            P = pred_obj.p[x]
+
+                        else:
+
+                            y_pred = pred_obj.y_pred[0]
+
+                            R = pred_obj.R2[0]
+                            P = pred_obj.p[0]
 
                     else:
 
-                        y_pred = pred_obj.y_pred[0]
-                        R = pred_obj.R2[0]
+                        if DPLS_kwargs["DPLSR"]["R_mode"] == 'single':
+
+                            y_pred = pred_obj.y_preds[x][:, enforce_P]
+                            R = pred_obj.y_pred_R2[x][enforce_P]
+
+                        else:
+
+                            y_pred = pred_obj.y_preds[0][:, enforce_P]
+                            R = pred_obj.y_pred_R2[0][enforce_P]
+
+                        P = enforce_P
 
                     x_eg_use_i = pd.DataFrame()
 
@@ -2771,10 +2792,10 @@ if use_data_type == use_data_options[0]:
                     # 更新布局
                     fig.update_layout(
                         title=dict(
-                            text=f"x_{x_eg_columns.index(x_i) + 1} vs y, R:{R:.2f}<span style='color:#76B900'><b> </b></span>",
-                            x=0.3,  # 居中，可调
+                            text=f"x_{x_eg_columns.index(x_i) + 1} vs y, R:{R:.2f}, P: {P+1}<span style='color:#76B900'><b> </b></span>",
+                            x=0.35,  # 居中，可调
                             xanchor='right',
-                            font=dict(size=15),
+                            font=dict(size=19),
                         ),
                         showlegend=False,
                         height=370,

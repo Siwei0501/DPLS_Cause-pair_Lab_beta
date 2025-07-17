@@ -248,8 +248,7 @@ class DPLS:
             # m5 = [2.23458811, -3.34167600, 0.980818]
 
             try:
-                Fit_R2P = 1 / (1 + np.exp(
-                    -1 * (m[X.shape[1] - 1][0]) * (np.log(P /X.shape[0]) - (m[X.shape[1] - 1][1]))))
+                Fit_R2P = 1 / (1 + np.exp(-1 * (m[X.shape[1] - 1][0]) * (np.log(P /X.shape[0]) - (m[X.shape[1] - 1][1]))))
 
             except IndexError:
 
@@ -287,16 +286,7 @@ class DPLS:
 
             elif self.fit_mode == 'Fit':
 
-                fit_stored = self._DPLS_PLS_core(X, y, cv=1)
-
-                if fit_stored['y_pred_R2'] is None:
-                    return fit_stored
-
-                fit_pred_R2 = fit_stored['y_pred_R2']
-                fit_y_preds = fit_stored['y_preds']
-
                 fit_P = np.argmax(Each_R2P)
-
 
             else:
                 raise AttributeError(f"Do not understand param of fit_mode: {self.fit_mode} ")
@@ -561,14 +551,27 @@ class DPLS:
         return DPLS_pairs
 
 
-# if __name__ == '__main__':
-#
-#     from Projects.Muti_func_creat.muti_func_test import gen_y_exp, add_noise
-#
-#
-#     for i in range(5):
-#
-#         x,file_values,y_exp,x_picked = gen_y_exp(sample_num=1000, param_num=3, use_x_num=3, x_seed=i)
+if __name__ == '__main__':
+
+    from cause_pair_functions.muti_func_test import gen_y_exp, add_noise
+    from matplotlib import pyplot as plt
+
+    for i in range(5):
+
+        x,file_values,y_exp,x_picked = gen_y_exp(sample_num=700, param_num=1, use_x_num=1, x_num=1, x_seed=i,  use_x_func = ["正弦函数"], x_start=-2.6, x_end=2.7)
+        y_obs = add_noise(y_exp, noise_degree=0.2)
+        y_pred = DPLS().fit(X=x, y=y_obs, fit_mode='Fit').y_pred[0]
+
+        plt.scatter(x, y_exp, color='blue', label='y1: Series A', alpha=0.5)
+        plt.scatter(x, y_pred, color='red', label='y2: Series B', alpha=0.5)
+
+        plt.xlabel('X value')
+        plt.ylabel('Y value')
+        plt.title('Scatter Plot: X vs Y1 and Y2')
+        plt.legend()
+        plt.grid(True)
+        plt.show()
+
 #
 #         # x['x_2'] = np.sin(np.pi * x['x_1'])
 #         # aa = add_noise(x['x_2'], 1.0)
