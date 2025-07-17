@@ -2728,6 +2728,8 @@ if use_data_type == use_data_options[0]:
 
                 st.markdown("---")
 
+                blue_print = st.selectbox('切换打印的 y', options=['y_obs', 'y_exp'])
+
                 with st.spinner("正在拟合..."):
 
                     pred_obj = DPLS(**DPLS_kwargs["DPLSR"]).fit(x_eg_use.copy(), y_df_eg['y_obs'].copy(),
@@ -2751,7 +2753,14 @@ if use_data_type == use_data_options[0]:
 
                     x_eg_use_i[x_i] = pred_obj.X.copy()[:, x]
 
-                    x_eg_use_i['y'] = y_df_eg['y_obs']
+                    if blue_print == 'y_obs':
+
+                        x_eg_use_i['y'] = y_df_eg['y_obs']
+
+                    else:
+
+                        x_eg_use_i['y'] = y_df_eg['y_exp']
+
                     x_eg_use_i['preds'] = y_pred  # 使用完整预测值
 
                     # 创建基础散点图（x_i vs y，蓝色）
