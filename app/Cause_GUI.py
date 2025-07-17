@@ -14,7 +14,7 @@ from typing import Literal, Union
 
 import numpy as np
 import pandas as pd
-import plotly.express as px
+import plotly.graph_objects as go
 import streamlit as st
 from joblib import Parallel, delayed
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
@@ -358,7 +358,6 @@ def param_controller(param_list: list, para_descriptions: dict, param_controls: 
                             )
 
 
-
         else:
             with st.expander(
                     f"{desc}\t{chr(9312 + m)}&nbsp;&nbsp;{param}:&nbsp;&nbsp;&nbsp;{para_descriptions.get(param, '')} ",
@@ -367,6 +366,7 @@ def param_controller(param_list: list, para_descriptions: dict, param_controls: 
                 st.markdown('---')
 
         m += 1
+
     return param_kwargs
 
 
@@ -626,7 +626,7 @@ st.markdown("""
 /* 标题容器整体上移 */
 .custom-title-container {
     position: relative;
-    top: -43px;
+    top: -23px;
     left: 35px;
     margin-bottom: 10px;
     margin-top: 25px;
@@ -2022,21 +2022,21 @@ if use_data_type == use_data_options[0]:
 
     # 7-2-3 定义生成模拟数据的控制面板 ---------------------------------------------------------------------------------------
 
-    create_preview_panel, create_sep1, create_control_panel, create_sep3, create_runinfo_panel = st.columns([.666, 0.013, .185, 0.007, .135,])
+    st.subheader('函数控制面板')
+    st.markdown('')
+    st.markdown('---')
+    st.markdown("")
 
-    with create_control_panel:
+    create_data_expander = st.expander('**生成模拟数据**', expanded=True)
+    with create_data_expander:
 
-        st.subheader('函数控制面板')
-        st.markdown('')
+        # 7-2-3-1 无关功能 -------------------------------------------------------------------------------------------
+
         st.markdown('---')
-        st.markdown("")
 
-        create_data_expander = st.expander('**生成模拟数据**', expanded=True)
-        with create_data_expander:
+        unrelated_and_interaction_col, redun_col, func_bank_col, slider_col_1, check_button_col  = st.columns([1, 1, 1, 1, 1])
 
-            # 7-2-3-1 无关功能 -------------------------------------------------------------------------------------------
-
-            st.markdown('---')
+        with unrelated_and_interaction_col:
 
             unrelated_expander = st.expander("无关", expanded=True)
 
@@ -2091,8 +2091,54 @@ if use_data_type == use_data_options[0]:
                                                            help="从 [特征池] 内取用的 [X] 的数量, 取用 [X] 数量 ≤ [特征池]大小"
                                                            )
 
+            creation_seed_expander = st.expander("随机种子", expanded=True)
 
-            # 7-2-3-2 冗余功能 -------------------------------------------------------------------------------------------
+            with creation_seed_expander:
+
+                create_funcseed_col, create_xseed_col = st.columns([1, 1])
+
+                with create_funcseed_col:
+
+                    if "formular_refresh" in st.session_state and "create_funcseed" in st.session_state:
+
+                        if st.session_state["formular_refresh"]:
+
+                            create_funcseed = st.number_input("f(x)随机种子", min_value=0, max_value=20000, step=1,
+                                                              value=st.session_state["create_funcseed"] + 1,
+                                                              key="create_funcseed",
+                                                              help="输入x数量后, 每个x被分到一个f构成f(x), f不一定一样, 随机种子用于决定这些 f"
+                                                              )
+
+                        else:
+
+                            create_funcseed = st.number_input("f(x)随机种子", min_value=0, max_value=20000, step=1,
+                                                              value=st.session_state["create_funcseed"],
+                                                              key="create_funcseed",
+                                                              help="输入x数量后, 每个x被分到一个f构成f(x), f不一定一样, 随机种子用于决定这些 f"
+                                                              )
+
+                        st.session_state["formular_refresh"] = False
+
+
+                    else:
+
+                        create_funcseed = st.number_input("f(x)随机种子", min_value=0, max_value=20000, step=1,
+                                                          value=73, key="create_funcseed",
+                                                          help="输入x数量后, 每个x被分到一个f构成f(x), f不一定一样, 随机种子用于决定这些 f"
+                                                          )
+                        st.session_state["formular_refresh"] = False
+
+                with create_xseed_col:
+
+                    create_xseed = st.number_input("x的随机种子", min_value=0, max_value=20000, step=1, value=409,
+                                                   key="create_xseed",
+                                                   help="输入x数量后, 每个x会在你给出的定义域上随机抽取n个(每个x抽到的不一样, 即使你只给了一个随机种子), x的随机种子用于决定这个抽取过程"
+                                                   )
+
+
+        # 7-2-3-2 冗余功能 -------------------------------------------------------------------------------------------
+
+        with redun_col:
 
             redun_expander = st.expander("冗余", expanded=True)
 
@@ -2145,7 +2191,49 @@ if use_data_type == use_data_options[0]:
                                                      "[⚠️激进的参数]: 此项将会显著增加函数复杂度  \n"
                                                      "[⚡不受控的参数]: 开启此项后, 将不受随机种子控制")
 
-            # 7-2-3-3互作功能 --------------------------------------------------------------------------------------------
+            redun_seed_expander = st.expander("冗余种子", expanded=True)
+
+            with redun_seed_expander:
+
+                redun_seed_col, x_genmode_col = st.columns([1, 1])
+
+                with redun_seed_col:
+
+                    create_redun_seed = st.number_input("冗余随机种子", min_value=0, max_value=20000, step=1, value=73,
+                                                        key="create_redun_seed",
+                                                        help="开启冗余后, 随机种子用于决定冗余的状态"
+                                                        )
+
+                with x_genmode_col:
+
+                    create_x_mode = st.selectbox("X取值模式", ["均匀", "成长型", "抛物线型"], key="create_x_mode",
+                                                help="[均匀]模式时,X在定义域内取到每个点的概率相同, [成长型]:X越大取到的概率越大, [抛物线型]:中间的X被取到的概率更大")
+
+                    create_x_mode_transfer = {
+                        "均匀":"uniform",
+                        "成长型":"grow",
+                        "抛物线型":'parabola'
+                    }
+
+                    create_x_mode = create_x_mode_transfer[create_x_mode]
+
+
+                st.markdown("")
+                st.markdown("")
+
+                create_redun_slope = st.slider("X的冗余倾向 ⚠️", min_value=1.0, max_value=8.0, step=0.5, value=2.5,
+                                               key="create_redun_slope",
+                                               help="[⛓️‍存在依赖项]: 此项发挥作用需要 [开启冗余] 被设置为 [True],  \n"
+                                                    "[⚠️激进的参数]: 此参数将显著影响函数复杂度,  \n"
+                                                    "[互作倾向] 越高,则越可能生成复杂的 [互作项], 也越可能使用 [冗余特征] 参与构成 [y]  \n"
+                                               )
+
+                st.markdown("")
+
+
+        # 7-2-3-3互作功能 --------------------------------------------------------------------------------------------
+
+        with unrelated_and_interaction_col:
 
             interaction_expander = st.expander("互作", expanded=True)
 
@@ -2193,184 +2281,143 @@ if use_data_type == use_data_options[0]:
                                                              "[总结]: 当此项设为 [n] 时, 将不会超过参与项超过 [n] 的 [互作项]"
                                                         )
 
-            # 7-2-3-4 随机种子 -------------------------------------------------------------------------------------------
+        # 7-2-3-4 随机种子 -------------------------------------------------------------------------------------------
 
-            creation_seed_expander = st.expander("随机种子", expanded=True)
+        with func_bank_col:
 
-            with creation_seed_expander:
+            funcx_bank_expander = st.expander("可出现的f(x)", expanded=True)
 
-                create_funcseed_col, create_xseed_col = st.columns([1, 1])
+            with funcx_bank_expander:
 
+                create_x_bank = st.multiselect(label="f(x):", options=["All"] + list(function_dict.keys()),
+                                               default=["线性函数", "正弦函数", "二次函数"], key="create_x_bank",
+                                               help=
+                                               "'正弦函数': f'sin(πx)',  \n"
+                                               "'余弦函数': f'cos(πx)'  \n"
+                                               "'二次函数': f'2(x)^2',  \n"
+                                               "'平方根函数': f'sqrt(x)',  \n"
+                                               "'指数函数': f'e^x',  \n"
+                                               "'对数函数（平移）': f'log(x+1)',  \n"
+                                               "'对数函数（加偏移防负值）': f'log(x)',  \n"
+                                               "'Sigmoid 函数': f'1/(1+e^-6x)',  \n"
+                                               "'三次多项式函数': f'2x^3+x^2-2x',  \n"
+                                               "'指数幂函数': f'2^5(x+1)',  \n"
+                                               "'高频正弦函数': f'sin(2πx)',  \n"
+                                               "'混合三角+线性函数': f'1/5×sin(4x)+(11/10)×x',  \n"
+                                               "'高频正弦 + 线性项': f'sin(5πx)+x',  \n"
+                                               "'高频余弦函数': f'cos(6πx)',  \n"
+                                               "'高频正弦线性混合函数': f'1/10×sin(10.6×f)+(11/10)×x',  \n"
+                                               "'非线性频率余弦函数': f'cos(5πx(x+1))',  \n"
+                                               "'非线性频率正弦函数': f'sin(4πx(x+1))'  \n"
+                                               )
 
-                with create_funcseed_col:
+                if "All" in create_x_bank:
+                    create_x_bank = list(function_dict.keys())
 
-                    if "formular_refresh" in st.session_state and "create_funcseed" in st.session_state:
-
-                        if st.session_state["formular_refresh"]:
-
-                            create_funcseed = st.number_input("f(x)随机种子", min_value=0, max_value=20000, step=1, value=st.session_state["create_funcseed"]+1, key="create_funcseed",
-                                                           help="输入x数量后, 每个x被分到一个f构成f(x), f不一定一样, 随机种子用于决定这些 f"
-                                                           )
-
-                        else:
-
-                            create_funcseed = st.number_input("f(x)随机种子", min_value=0, max_value=20000, step=1,
-                                                              value=st.session_state["create_funcseed"],
-                                                              key="create_funcseed",
-                                                              help="输入x数量后, 每个x被分到一个f构成f(x), f不一定一样, 随机种子用于决定这些 f"
-                                                              )
-
-                        st.session_state["formular_refresh"] = False
-
-
-                    else:
-
-                        create_funcseed = st.number_input("f(x)随机种子", min_value=0, max_value=20000, step=1, value=73, key="create_funcseed",
-                                                       help="输入x数量后, 每个x被分到一个f构成f(x), f不一定一样, 随机种子用于决定这些 f"
-                                                       )
-                        st.session_state["formular_refresh"] = False
+            func_xtox_bank_expander = st.expander("可出现的互作函数", expanded=True)
 
 
-                    create_redun_seed = st.number_input("f冗余随机种子", min_value=0, max_value=20000, step=1, value=73, key="create_redun_seed",
-                                                       help="开启冗余后, 随机种子用于决定冗余的状态"
-                                                       )
+            with func_xtox_bank_expander:
+
+                if not create_x_bank:
+                    create_x_bank = ["正弦函数"]
+
+                create_xtox_bank = st.multiselect(label="f(x, x):", options=["All"] + list(xtox_func_dict.keys()),
+                                                  default=["积函数", "绝对值和函数", "正弦和函数"],
+                                                  key="create_xtox_bank")
+
+                if "All" in create_xtox_bank:
+                    create_xtox_bank = list(xtox_func_dict.keys())
+
+            if len(create_x_bank)+len(create_xtox_bank) <10:
+                st.markdown("---")
 
 
+        # 7-2-3-5 一些其他功能 ----------------------------------------------------------------------------------------
 
-                with create_xseed_col:
+        with slider_col_1:
 
-                    create_xseed = st.number_input("x的随机种子", min_value=0, max_value=20000, step=1, value=409, key="create_xseed",
-                                                   help="输入x数量后, 每个x会在你给出的定义域上随机抽取n个(每个x抽到的不一样, 即使你只给了一个随机种子), x的随机种子用于决定这个抽取过程"
-                                                   )
+            with st.expander("DPLS_lab", expanded=True):
 
-                    create_x_mode = st.selectbox("X取值模式", ["均匀", "成长型", "抛物线型"], key="create_x_mode",
-                                                help="[均匀]模式时,X在定义域内取到每个点的概率相同, [成长型]:X越大取到的概率越大, [抛物线型]:中间的X被取到的概率更大")
+                create_linear_coef_range = st.slider("线性函数系数范围", -10, 10, (-3, 3), key="create_linear_coef_range", step=1)
 
-                    create_x_mode_transfer = {
-                        "均匀":"uniform",
-                        "成长型":"grow",
-                        "抛物线型":'parabola'
-                    }
-
-                    create_x_mode = create_x_mode_transfer[create_x_mode]
+                create_linear_intercept_range = st.slider("线性函数截距范围", -25, 25, (-5, 5), key='create_linear_intercept_range', step=2)
 
 
-            # 7-2-3-5 一些其他功能 ----------------------------------------------------------------------------------------
-            st.markdown("")
-            create_linear_coef_col, create_linear_intercept_col = st.columns([1, 1])
+                st.markdown("---")
 
-            with create_linear_coef_col:
+                all_param_expander = st.expander("所有函数参数", expanded=True)
 
                 create_noise = st.slider("y_obs 噪音强度", min_value=0.0, max_value=8.0, step=0.1, value=0.5,
                                                   key="create_noise",
                                                   help="生成模拟样本后往[期望值y_exp]添加的噪音强度"
-                                                  )
-
-                create_linear_coef_range = st.slider("线性函数系数范围", -10, 10, (-3, 3), key="create_linear_coef_range", step=1)
+                                              )
 
 
-            with create_linear_intercept_col:
-                create_redun_slope = st.slider("X的冗余倾向 ⚠️", min_value=1.0, max_value=8.0, step=0.5, value=2.5,
-                                                  key="create_redun_slope",
-                                                  help="[⛓️‍存在依赖项]: 此项发挥作用需要 [开启冗余] 被设置为 [True],  \n"
-                                                       "[⚠️激进的参数]: 此参数将显著影响函数复杂度,  \n"
-                                                       "[互作倾向] 越高,则越可能生成复杂的 [互作项], 也越可能使用 [冗余特征] 参与构成 [y]  \n"
-                                                  )
-                create_linear_intercept_range = st.slider("线性函数截距范围", -25, 25, (-5, 5), key='create_linear_intercept_range', step=2)
+        with check_button_col:
 
-            create_x_bank = st.multiselect(label="可出现的f(x):", options=["All"] + list(function_dict.keys()),
-                                           default=["线性函数", "正弦函数", "二次函数"], key="create_x_bank",
-                                           help=
-                                           "'正弦函数': f'sin(πx)',  \n"
-                                           "'余弦函数': f'cos(πx)'  \n"
-                                           "'二次函数': f'2(x)^2',  \n"
-                                           "'平方根函数': f'sqrt(x)',  \n"
-                                           "'指数函数': f'e^x',  \n"
-                                           "'对数函数（平移）': f'log(x+1)',  \n"
-                                           "'对数函数（加偏移防负值）': f'log(x)',  \n"
-                                           "'Sigmoid 函数': f'1/(1+e^-6x)',  \n"
-                                           "'三次多项式函数': f'2x^3+x^2-2x',  \n"
-                                           "'指数幂函数': f'2^5(x+1)',  \n"
-                                           "'高频正弦函数': f'sin(2πx)',  \n"
-                                           "'混合三角+线性函数': f'1/5×sin(4x)+(11/10)×x',  \n"
-                                           "'高频正弦 + 线性项': f'sin(5πx)+x',  \n"
-                                           "'高频余弦函数': f'cos(6πx)',  \n"
-                                           "'高频正弦线性混合函数': f'1/10×sin(10.6×f)+(11/10)×x',  \n"
-                                           "'非线性频率余弦函数': f'cos(5πx(x+1))',  \n"
-                                           "'非线性频率正弦函数': f'sin(4πx(x+1))'  \n"
-                                           )
+            with st.expander("DPLS_lab", expanded=True):
 
-            if "All" in create_x_bank:
-                create_x_bank = list(function_dict.keys())
-
-            if not create_x_bank:
-                create_x_bank = ["正弦函数"]
+                create_define = st.slider("定义域", -5.0, 5.0, (-1.0, 1.0), key="create_define", step=0.1)
+                create_define_left = create_define[0]
+                create_define_right = create_define[1]
 
 
-            create_xtox_bank = st.multiselect(label="可出现的互作函数:", options=["All"] + list(xtox_func_dict.keys()),
-                                              default=["积函数", "绝对值和函数", "正弦和函数"], key="create_xtox_bank")
-
-            if "All" in create_xtox_bank:
-                create_xtox_bank = list(xtox_func_dict.keys())
+                create_thresh_range = st.slider("数据量限制在", 0, 10000, (300, 700), key="create_thresh_range", step=100)
 
 
-            create_define = st.slider("定义域", -5.0, 5.0, (-1.0, 1.0), key="create_define", step=0.1)
+                create_linear_limit_col, only_usedx_col = st.columns([1.7, 1])
 
-            create_define_left = create_define[0]
-            create_define_right = create_define[1]
+                with create_linear_limit_col:
 
-            create_thresh_range = st.slider("数据量限制在", 0, 10000, (300, 700), key="create_thresh_range", step=100)
+                    create_linear_limit = st.checkbox("仅生成线性样本", key="create_linear_limit")
 
-            create_linear_limit_col, only_usedx_col = st.columns([2, 1])
+                with only_usedx_col:
 
-            with create_linear_limit_col:
+                    use_x_piked = st.checkbox("排除无关特征", key="use_x_piked", value=True)
 
-                create_linear_limit = st.checkbox("仅生成线性样本", key="create_linear_limit")
+                st.markdown("---")
 
-            with only_usedx_col:
-
-                use_x_piked = st.checkbox("排除无关特征", key="use_x_piked", value=True)
-
-            check_file_button = st.button("**运行前检视样本**", use_container_width=True, icon="🔍")
+                check_file_button = st.button("**运行前检视样本**", use_container_width=True, icon="🔍")
 
 
-        # 7-3 收集参数 ---------------------------------------------------------------------------------------------------
+    # 7-3 收集参数 ---------------------------------------------------------------------------------------------------
 
-        # 传给 gen_y_exp 的参数
-        create_kwargs = {
+    # 传给 gen_y_exp 的参数
+    create_kwargs = {
 
-            "param_num": create_param_num,
-            "use_x_num": create_use_x_num,
-            "x_num": create_x_num,
-            "x_to_x_num": create_xtox_num,
-            "x_to_x_level": create_xtox_level,
-            "redundancy": create_redun,
-            "redun_ratio": create_redun_slope,
-            "func_seed": create_funcseed,
-            "x_seed": create_xseed,
-            "linear_coef_range": create_linear_coef_range,
-            "linear_intercept_range": create_linear_intercept_range,
-            "x_start": create_define_left,
-            "x_end": create_define_right,
-            "linear": create_linear_limit,
-            "use_x_func": create_x_bank,
-            "use_xtox_func": create_xtox_bank,
-            'redun_seed': create_redun_seed,
-            'x_mode': create_x_mode,
-        }
+        "param_num": create_param_num,
+        "use_x_num": create_use_x_num,
+        "x_num": create_x_num,
+        "x_to_x_num": create_xtox_num,
+        "x_to_x_level": create_xtox_level,
+        "redundancy": create_redun,
+        "redun_ratio": create_redun_slope,
+        "func_seed": create_funcseed,
+        "x_seed": create_xseed,
+        "linear_coef_range": create_linear_coef_range,
+        "linear_intercept_range": create_linear_intercept_range,
+        "x_start": create_define_left,
+        "x_end": create_define_right,
+        "linear": create_linear_limit,
+        "use_x_func": create_x_bank,
+        "use_xtox_func": create_xtox_bank,
+        'redun_seed': create_redun_seed,
+        'x_mode': create_x_mode,
+    }
 
-        # 传给 detail_panel 的参数
-        file_param = {
-            "正在分析": "模拟样本",
-            "非法样本兼容": illegal_compatible_mode,
-            '样本方向': file_direction,
-            '分析方向': analys_direction,
-            '文件抽样数': test_files_num,
-            '文件抽样种子': seed_value,
-            '样本量': thresh_range,
-            "开启冗余": f"是" if create_redun else "否",
-            "仅生成线性样本": create_linear_limit,
-        }
+    # 传给 detail_panel 的参数
+    file_param = {
+        "正在分析": "模拟样本",
+        "非法样本兼容": illegal_compatible_mode,
+        '样本方向': file_direction,
+        '分析方向': analys_direction,
+        '文件抽样数': test_files_num,
+        '文件抽样种子': seed_value,
+        '样本量': thresh_range,
+        "开启冗余": f"是" if create_redun else "否",
+        "仅生成线性样本": create_linear_limit,
+    }
 
     # 7-4 定义模拟数据检视逻辑 ---------------------------------------------------------------------------------------------
 
@@ -2430,14 +2477,25 @@ if use_data_type == use_data_options[0]:
 
         use_files_dict = created_data
 
+    st.markdown("")
+
+    hr_second(dark_color="#244690", height=2, light_color="#26519d")
+    st.markdown("")
+    st.markdown("")
+    st.markdown("")
+    st.subheader("预览界面")
+    st.markdown("")
+    st.markdown("")
+
+    st.markdown("---")
+
+    create_formular_panel, create_sep3, create_datanum_panel = st.columns([.75, 0.03, .25])
+
+
 # 7-5 Createdata-enhance 区 ---------------------------------------------------------------------------------------------
 
-    with create_preview_panel:
+    with create_formular_panel:
 
-        st.subheader('模拟样本预览区')
-        st.markdown('')
-        st.markdown('---')
-        st.markdown("")
 
         # 7-5-1 定义内容区 -----------------------------------------------------------------------------------------------
 
@@ -2457,8 +2515,6 @@ if use_data_type == use_data_options[0]:
         with st.spinner("正在生成函数实例, 勿点击任何按钮..."):
 
             # 7-5-2 控制面板的参数传入用于 eg 的生成 -------------------------------------------------------------------------
-
-
 
             np.random.seed(create_kwargs["x_seed"])
             eg_create_samples = np.random.randint(create_thresh_range[0], create_thresh_range[1])
@@ -2611,7 +2667,6 @@ if use_data_type == use_data_options[0]:
         latex_expr = apply_colored_brackets(formula_eg)
         st.latex(latex_expr)
 
-        st.markdown("")
         st.markdown('')
         st.markdown('')
         st.markdown('')
@@ -2625,7 +2680,9 @@ if use_data_type == use_data_options[0]:
 
         st.markdown("")
         st.markdown("")
-        create_Formula_panel_1, create_Formula_sep_1, create_Formula_panel_2 = st.columns([.65,0.018, .35])
+        st.markdown("")
+
+        create_Formula_panel_2, create_Formula_sep_1, create_Formula_panel_1 = st.columns([.618, 0.018, .382])
 
         # 独立与互作特征鉴别器(待升级)
         def count_unique_ai(expr: str, list_a: list) -> int:
@@ -2635,68 +2692,63 @@ if use_data_type == use_data_options[0]:
                     count += 1
             return count
 
-        with create_runinfo_panel:
+        with create_datanum_panel:
 
-            st.subheader('DPLS 参数')
-            st.markdown('')
-            st.markdown('---')
+            st.markdown("")
+            render_section_title("来自函数的样本:")
+            with st.expander(f"**{x_eg.shape}**", expanded=True):
+                st.markdown("---")
+                st.dataframe(x_eg_use.copy(), height=795, hide_index=True)
+
+            st.markdown("")
             st.markdown("")
 
-            # 读取颜色（默认浅色）
+            y_df_eg = pd.DataFrame()
+            y_df_eg["y_exp"] = y_exp_eg
+            y_df_eg["y_obs"] = y_obs_eg
 
-            # 使用 expander 创建一个可折叠/展开的区域
-            DPLSR_param_dict_ = DPLSR_param_dict.copy()
-            # DPLSR_param_dict_["R_mode"]={"type": "selectbox", "label": "求R模式, [fusion]: 返回整个样本集的DPLSR, [single]: 返回每列的DPLSR","options": ['fusion', 'single'], "value": 'single'}
-            DPLS_kwargs = param_controller(
-                param_list=['DPLSR'],
-                para_descriptions={'DPLSR': method_descriptions.get('DPLSR')},
-                param_controls={"DPLSR": DPLSR_param_dict_},
-                desc='方法',
-                a_copied_dict=True
-            )
+            render_section_title("Y of func")
+            with st.expander(f"**{y_df_eg.shape}** | PersonR^2 = {calculate_corr(y_exp_eg, y_obs_eg)[0]:.3f}",
+                             expanded=True):
+                st.markdown("---")
+                st.dataframe(y_df_eg, height=795, hide_index=True)
 
-            if not DPLS_kwargs['DPLSR']["distance_pattern"]:
-                DPLS_kwargs['DPLSR']["distance_pattern"] = ['Euc']
+
 
         # 7-5-5 打印样本的 X 与 y -----------------------------------------------------------------------------------------
 
-        with create_Formula_panel_1:
+        with create_Formula_panel_2:
 
 
-            formula_panel1_col1, f_sep1, formula_panel1_col2 = st.columns([.738,0.025,.382])
-
-
-            with formula_panel1_col1:
-
-                st.markdown("")
-                st.markdown("")
-                render_section_title("来自函数的样本:")
-                with st.expander(f"**{x_eg.shape}**", expanded=True):
-                    st.markdown("---")
-                    st.dataframe(x_eg_use.copy(), height=795, hide_index=True)
-
+            formula_panel1_col1, f_sep1, formula_panel1_col2 = st.columns([.382,0.025,.618])
 
             with formula_panel1_col2:
 
-                st.markdown("")
-                st.markdown("")
+                render_section_title("DPLS 控制面板:")
 
-                y_df_eg = pd.DataFrame()
-                y_df_eg["y_exp"] = y_exp_eg
-                y_df_eg["y_obs"] = y_obs_eg
+                # 读取颜色（默认浅色）
 
-                render_section_title("Y of func")
-                with st.expander(f"**{y_df_eg.shape}** | PersonR^2 = {calculate_corr(y_exp_eg, y_obs_eg)[0]:.3f}", expanded=True):
-                    st.markdown("---")
-                    st.dataframe(y_df_eg, height=795, hide_index=True)
+                # 使用 expander 创建一个可折叠/展开的区域
+                DPLSR_param_dict_ = DPLSR_param_dict.copy()
+                DPLS_kwargs = param_controller(
+                    param_list=['DPLSR'],
+                    para_descriptions={'DPLSR': method_descriptions.get('DPLSR')},
+                    param_controls={"DPLSR": DPLSR_param_dict_},
+                    desc='方法',
+                    a_copied_dict=True
+                )
+
+                if not DPLS_kwargs['DPLSR']["distance_pattern"]:
+                    DPLS_kwargs['DPLSR']["distance_pattern"] = ['Euc']
+
+
 
         # 7-5-6 打印模拟样本的生成参数 与 参数符合度的检测结果 ------------------------------------------------------------------
 
-        with create_Formula_panel_2:
+        with create_Formula_panel_1:
 
             # 使用 expander 创建一个可折叠/展开的区域
-            st.markdown("")
-            st.markdown("")
+
             render_section_title("DPLS Plots:")
 
 
@@ -2704,7 +2756,22 @@ if use_data_type == use_data_options[0]:
 
                 st.markdown("---")
 
-                blue_print = st.selectbox('切换打印的 y', options=['y_obs', 'y_exp'])
+                enforce_P = st.slider("硬定位的 P: ", min_value=-1, max_value=DPLS_kwargs['DPLSR']['max_iter']-1, value=-1, key='enforce_P')
+
+                plot_y_sep, plot_exp_col, plot_obs_col = st.columns([.58, 1.5, 1])
+
+                with plot_exp_col:
+
+                    print_exp = st.checkbox('y_exp', value=True, key='print_exp')
+
+                with plot_obs_col:
+
+                    print_obs = st.checkbox('y_obs', value=False, key='print_obs')
+
+                st.markdown("")
+
+
+            with st.expander("", expanded=True):
 
                 with st.spinner("正在拟合..."):
 
@@ -2715,69 +2782,114 @@ if use_data_type == use_data_options[0]:
 
                     x = list(x_eg_use.columns).index(x_i)
 
-                    if DPLS_kwargs["DPLSR"]["R_mode"] == 'single':
+                    if enforce_P == -1:
 
-                        y_pred = pred_obj.y_pred[x]
-                        R = pred_obj.R2[x]
+                        if DPLS_kwargs["DPLSR"]["R_mode"] == 'single':
+
+                            y_pred = pred_obj.y_pred[x]
+                            print("y_pred:", y_pred.shape)
+
+                            R = pred_obj.R2[x]
+                            P = pred_obj.p[x]
+
+                        else:
+
+                            y_pred = pred_obj.y_pred[0]
+
+                            R = pred_obj.R2[0]
+                            P = pred_obj.p[0]
 
                     else:
 
-                        y_pred = pred_obj.y_pred[0]
-                        R = pred_obj.R2[0]
+                        if DPLS_kwargs["DPLSR"]["R_mode"] == 'single':
+
+                            y_pred = pred_obj.y_preds[x][:, enforce_P]
+                            R = pred_obj.y_pred_R2[x][enforce_P]
+
+                        else:
+
+                            y_pred = pred_obj.y_preds[0][:, enforce_P]
+                            R = pred_obj.y_pred_R2[0][enforce_P]
+
+                        P = enforce_P
 
                     x_eg_use_i = pd.DataFrame()
 
                     x_eg_use_i[x_i] = pred_obj.X.copy()[:, x]
 
-                    if blue_print == 'y_obs':
+                    if print_exp:
 
-                        x_eg_use_i['y'] = y_df_eg['y_obs']
+                        x_eg_use_i['y_exp'] = y_df_eg['y_exp']
 
-                    else:
+                    if print_obs:
 
-                        x_eg_use_i['y'] = y_df_eg['y_exp']
+                        x_eg_use_i['y_obs'] = y_df_eg['y_obs']
 
                     x_eg_use_i['preds'] = y_pred  # 使用完整预测值
 
-                    # 创建基础散点图（x_i vs y，蓝色）
-                    fig = px.scatter(
-                        x_eg_use_i,
-                        x=x_i,
-                        y='y',
-                        labels={'x': x_i, 'y': 'target'},
-                        color_discrete_sequence=['#3580f5'],  # 直接指定蓝色
-                        opacity=0.82
-                    )
+                    # 创建一个空图
+                    fig = go.Figure()
 
-                    # 添加预测值散点（x_i vs preds，橙色）
+                    # 添加 y_exp（蓝色），优先添加以保证 preds 最上层
+                    if print_exp:
+                        fig.add_scatter(
+                            x=x_eg_use_i[x_i],
+                            y=x_eg_use_i['y_exp'],
+                            mode='markers',
+                            name='y_exp',
+                            marker=dict(
+                                color='#3580F5',
+                                size=6,
+                                opacity=0.75
+                            )
+                        )
+
+                    # 添加 y_obs（绿色）
+                    if print_obs:
+                        fig.add_scatter(
+                            x=x_eg_use_i[x_i],
+                            y=x_eg_use_i['y_obs'],
+                            mode='markers',
+                            name='y_obs',
+                            marker=dict(
+                                color='#079967',
+                                size=6,
+                                opacity=0.85
+                            )
+                        )
+
+                    # 最后添加 preds（橙色），确保在最上层
                     fig.add_scatter(
                         x=x_eg_use_i[x_i],
                         y=x_eg_use_i['preds'],
                         mode='markers',
-                        name='Predicted',
+                        name='preds',
                         marker=dict(
-                            color='#FFB420',  # 橙色
+                            color='#FFB420',
                             size=4.5,
-                            opacity=0.85
+                            opacity=0.82
                         )
                     )
 
-                    # 确保原始数据点的样式
-                    fig.update_traces(
-                        marker=dict(size=6),
-                        selector=dict(marker=dict(color='#3580f5'))  # 更精确的选择器
+                    # 更新坐标轴标签
+                    fig.update_layout(
+                        xaxis_title=x_i,
+                        yaxis_title='target',
+                        legend=dict(
+                            traceorder="normal"  # 图例顺序按添加顺序排列
+                        )
                     )
 
                     # 更新布局
                     fig.update_layout(
                         title=dict(
-                            text=f"x_{x_eg_columns.index(x_i) + 1} vs y, R:{R:.2f}<span style='color:#76B900'><b> </b></span>",
-                            x=0.3,  # 居中，可调
+                            text=f"x_{x_eg_columns.index(x_i) + 1} vs y, R:{R:.2f}, P: {P+1}<span style='color:#76B900'><b> </b></span>",
+                            x=0.35,  # 居中，可调
                             xanchor='right',
-                            font=dict(size=15),
+                            font=dict(size=19),
                         ),
                         showlegend=False,
-                        height=370,
+                        height=430,
                         margin=dict(t=30, b=30, l=10, r=10),
                         paper_bgcolor='rgba(0,0,0,0)',
                         plot_bgcolor='rgba(0,0,0,0)',
@@ -2804,7 +2916,7 @@ if use_data_type == use_data_options[0]:
 # 7-6 Plot 区域 ---------------------------------------------------------------------------------------------------------
 
 
-    with create_runinfo_panel:
+    with formula_panel1_col1:
 
 
         render_section_title("参数与检测:")
@@ -2875,8 +2987,6 @@ if use_data_type == use_data_options[0]:
 
             unrelated_num = create_param_num - indi_col
 
-            render_dataset_title("自变量", 14.8)
-
             x_use_xidx = [f'X_{x_eg_columns.index(x_i) + 1}' for x_i in x_picked_eg]
             x_use_idx = [x_eg_columns.index(x_i) + 1 for x_i in x_picked_eg]
 
@@ -2892,7 +3002,7 @@ if use_data_type == use_data_options[0]:
 
             display_detial_dict(exe_X)
 
-            render_dataset_title("无关", 14.8)
+            render_dataset_title("无关", 15)
             exe_unrelated = {
 
                 f"检测到无关列={(x_eg_use.shape[1] - create_use_x_num)}": " " + "".join(
@@ -2900,7 +3010,7 @@ if use_data_type == use_data_options[0]:
 
             display_detial_dict(exe_unrelated)
 
-            render_dataset_title("互作", 14.8)
+            render_dataset_title("互作", 15)
 
             exe_react = {
 
@@ -2915,7 +3025,7 @@ if use_data_type == use_data_options[0]:
 
             display_detial_dict(exe_react)
 
-            render_dataset_title("冗余", 14.8)
+            render_dataset_title("冗余", 15)
 
             redun_detected = any(x_use_idx_i > create_param_num for x_use_idx_i in x_use_idx)
 
@@ -2931,6 +3041,7 @@ if use_data_type == use_data_options[0]:
                 display_detial_dict({f'X_{x_eg_columns.index(x_i) + 1}': x_i[:50] for x_i in x_picked_eg if
                                      x_eg_columns.index(x_i) > create_param_num - 1})
 
+            st.markdown("")
             st.markdown("")
 
         # 7-6-1 拟合X与y_obs的 DPLS_obj  -----------------------------------------------------------------------------

@@ -188,7 +188,7 @@ def do_classify(classify_name, file_values:pd.DataFrame, train_list: list, test_
 
             if kwargs['parameter_optimization']:
 
-                grid = GridSearchCV(classify_model, param_grid, cv=5, scoring='accuracy', n_jobs=1)
+                grid = GridSearchCV(classify_model, param_grid, cv=2, scoring='accuracy', n_jobs=1)
                 grid.fit(X_train, y_train)
                 best_model = grid.best_estimator_
                 y_pred = best_model.predict(X_test)
@@ -805,7 +805,7 @@ def calculate_alpha(sample_num, alpha, tail='two'):
 
 if __name__ == '__main__':
 
-    combined_data = pd.read_excel('4000-02.xlsx', header=0, index_col=0)
+    combined_data = pd.read_excel('51abs02.xlsx', header=0, index_col=0)
     combined_data = combined_data.dropna(axis=0, how='any')
     train_list, test_list = spliter(combined_data.shape[0], cv=5)
 
@@ -826,4 +826,4 @@ if __name__ == '__main__':
         classify_results[classif] = classify_result_i
 
     results_DF = pd.DataFrame.from_dict(classify_results, orient='index')
-    results_DF.to_excel('CE_4000-02_result.xlsx')
+    results_DF.to_excel('CE_4000-51-abs02_result.xlsx')
