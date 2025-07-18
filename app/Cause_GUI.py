@@ -14,7 +14,7 @@ from typing import Literal, Union
 
 import numpy as np
 import pandas as pd
-import plotly.express as px
+import plotly.graph_objects as go
 import streamlit as st
 from joblib import Parallel, delayed
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
@@ -2022,7 +2022,15 @@ if use_data_type == use_data_options[0]:
 
     # 7-2-3 定义生成模拟数据的控制面板 ---------------------------------------------------------------------------------------
 
-    create_preview_panel, create_sep1, create_control_panel, create_sep3, create_runinfo_panel = st.columns([.666, 0.013, .185, 0.007, .135,])
+    create_preview_panel, create_sep1, create_control_panel = st.columns([.75, 0.013, .25])
+
+    st.markdown('')
+    st.markdown('')
+    st.markdown('---')
+    st.markdown('')
+    st.markdown('')
+
+    create_check_file_expander = st.expander("检视预览函数样本", expanded=False)
 
     with create_control_panel:
 
@@ -2042,55 +2050,62 @@ if use_data_type == use_data_options[0]:
 
             with unrelated_expander:
 
-                create_x_col, create_use_x_col = st.columns([1, 1])
+                create_use_x_col, create_x_col = st.columns([1, 1])
 
                 with create_x_col:
 
-                    create_param_num = st.number_input("生成X数量", min_value=1, max_value=25, step=1, value=2,
+                    create_interact_num = st.number_input("无关的X数量", min_value=0, max_value=20, step=1, value=0,
                                                        key="create_param_num",
                                                        help='这个参数决定 [特征池] 的大小,  参与 [y] 构成的那些自变量 [X] 将会在池中选择, 池中剩余的 [特征] 为[无关特征]',
                                                        )
 
                 with create_use_x_col:
 
-                    if "create_x_num" in st.session_state:
+                    create_use_x_num = st.number_input("使用的X数量", min_value=1,
+                                                       max_value=20,
+                                                       step=1, value=2, key="create_use_x_num",
+                                                       help="从 [特征池] 内取用的 [X] 的数量, 取用 [X] 数量 ≤ [特征池]大小"
+                                                       )
 
-                        if "create_xtox_num" in st.session_state:
+                    # if "create_x_num" in st.session_state:
+                    #
+                    #     if "create_xtox_num" in st.session_state:
+                    #
+                    #         use_min_limit = st.session_state["create_x_num"] + 2*st.session_state["create_xtox_num"]
+                    #
+                    #     else:
+                    #         use_min_limit = st.session_state["create_x_num"]
+                    #
+                    # else:
+                    #     use_min_limit = 1
+                    #
+                    #
+                    # if "create_use_x_num" in st.session_state:
+                    #
+                    #     if use_min_limit < st.session_state["create_use_x_num"]:
+                    #
+                    #         create_use_x_num = st.number_input("使用的X数量", min_value=use_min_limit, max_value=20,
+                    #                                            step=1, value=st.session_state["create_use_x_num"], key="create_use_x_num",
+                    #                                            help="从 [特征池] 内取用的 [X] 的数量, 取用 [X] 数量 ≤ [特征池]大小"
+                    #                                           )
+                    #
+                    #     else:
+                    #
+                    #         create_use_x_num = st.number_input("使用的X数量", min_value=use_min_limit, max_value=20,
+                    #                                            step=1, value=use_min_limit, key="create_use_x_num",
+                    #                                            help="从 [特征池] 内取用的 [X] 的数量, 取用 [X] 数量 ≤ [特征池]大小"
+                    #                                           )
+                    #
+                    # else:
+                    #
+                    #     create_use_x_num = st.number_input("使用的X数量", min_value=use_min_limit,
+                    #                                        max_value=20,
+                    #                                        step=1, value=2, key="create_use_x_num",
+                    #                                        help="从 [特征池] 内取用的 [X] 的数量, 取用 [X] 数量 ≤ [特征池]大小"
+                    #                                        )
 
-                            use_min_limit = min((st.session_state["create_x_num"] + 2*st.session_state["create_xtox_num"]), create_param_num)
 
-                        else:
-                            use_min_limit = min(st.session_state["create_x_num"], create_param_num)
-
-                    else:
-                        use_min_limit = 1
-
-                    use_max_limit = create_param_num
-
-                    if "create_use_x_num" in st.session_state:
-
-                        if use_min_limit < st.session_state["create_use_x_num"] <= use_max_limit:
-
-                            create_use_x_num = st.number_input("使用的X数量", min_value=use_min_limit, max_value=use_max_limit,
-                                                               step=1, value=st.session_state["create_use_x_num"], key="create_use_x_num",
-                                                               help="从 [特征池] 内取用的 [X] 的数量, 取用 [X] 数量 ≤ [特征池]大小"
-                                                              )
-
-                        else:
-
-                            create_use_x_num = st.number_input("使用的X数量", min_value=use_min_limit, max_value=use_max_limit,
-                                                               step=1, value=use_min_limit, key="create_use_x_num",
-                                                               help="从 [特征池] 内取用的 [X] 的数量, 取用 [X] 数量 ≤ [特征池]大小"
-                                                              )
-
-                    else:
-
-                        create_use_x_num = st.number_input("使用的X数量", min_value=use_min_limit,
-                                                           max_value=use_max_limit,
-                                                           step=1, value=create_param_num, key="create_use_x_num",
-                                                           help="从 [特征池] 内取用的 [X] 的数量, 取用 [X] 数量 ≤ [特征池]大小"
-                                                           )
-
+                    create_param_num = create_interact_num + create_use_x_num
 
             # 7-2-3-2 冗余功能 -------------------------------------------------------------------------------------------
 
@@ -2231,7 +2246,7 @@ if use_data_type == use_data_options[0]:
                         st.session_state["formular_refresh"] = False
 
 
-                    create_redun_seed = st.number_input("f冗余随机种子", min_value=0, max_value=20000, step=1, value=73, key="create_redun_seed",
+                    create_redun_seed = st.number_input("冗余随机种子", min_value=0, max_value=20000, step=1, value=73, key="create_redun_seed",
                                                        help="开启冗余后, 随机种子用于决定冗余的状态"
                                                        )
 
@@ -2432,6 +2447,87 @@ if use_data_type == use_data_options[0]:
 
 # 7-5 Createdata-enhance 区 ---------------------------------------------------------------------------------------------
 
+
+    # 实现括号上色的程序1
+    def colorize_brackets_by_depth(expr: str) -> str:
+        """
+        对表达式中的括号进行着色，按嵌套层级循环使用不同颜色，
+        并正确处理 LaTeX 中指数符号（^）所需的大括号匹配问题。
+
+        参数:
+            expr (str): 传入的原始字符串表达式（例如 "y = 2(2(x_2)^2)^2"）
+
+        返回:
+            str: 添加 LaTeX 颜色标签后的表达式，可直接用于 st.latex() 渲染
+        """
+        colors = ['orange', 'red', 'blue', 'yellow', "green", "violet", 'brown', "lime"]
+        num_colors = len(colors)
+        result = ''  # 最终拼接的 LaTeX 字符串
+        depth = 0  # 括号嵌套深度
+        stack = []  # 颜色栈，用于匹配每个左括号的颜色
+        char_energy = np.array([])  # 存储每个 ^ 所在时的括号层级，用于后续决定在哪里闭合大括号
+        char_len = len(expr)
+
+        # 遍历每个字符
+        for i, char in enumerate(expr):
+
+            if char == '^':
+                # 遇到 ^ 开启指数，追加 ^{ 并记录当前 depth
+                result += '^' + '{'
+                char_energy = np.append(char_energy, depth)
+
+            elif char == '(':
+                # 左括号，根据当前 depth 上色并入栈
+                color = colors[depth % num_colors]
+                result += rf'\textcolor{{{color}}}{{(}}'
+                stack.append(color)
+                depth += 1
+
+            elif char == ')':
+
+                # 右括号，先结束 ^ 开启的大括号（若满足闭合条件）
+
+                if stack:
+                    color = stack.pop()
+                else:
+                    color = colors[0]  # 兜底：括号不匹配时默认颜色
+
+                # 统计在当前 depth 下应该关闭多少个 ^ 所开启的大括号
+                energy_exhausted = char_energy >= depth - 1
+                char_energy = char_energy[char_energy < depth - 1]
+
+                # 加上当前层级右括号
+
+                result += "}" * np.sum(energy_exhausted)  # 添加闭合括号
+                depth -= 1
+                result += rf'\textcolor{{{color}}}{{)}}'
+
+            else:
+                # 普通字符直接加入结果
+                result += char
+
+            # 若到达末尾，补齐所有未关闭的大括号
+            if i == char_len - 1:
+                result += "}" * len(char_energy)
+
+        return result
+
+
+    # 实现括号上色的程序2
+    def apply_colored_brackets(expr: str) -> str:
+        """
+        对整个表达式按加号（+）分隔后逐段处理括号着色。
+
+        参数:
+            expr (str): 传入的表达式（例如 "y = 2(2(x_2)^2)^2 + sin(πx_1)"）
+
+        返回:
+            str: 添加括号颜色的完整表达式
+        """
+        terms = expr.split('+')
+        colored_terms = [colorize_brackets_by_depth(term.strip()) for term in terms]
+        return ' + '.join(colored_terms)
+
     with create_preview_panel:
 
         st.subheader('模拟样本预览区')
@@ -2457,7 +2553,6 @@ if use_data_type == use_data_options[0]:
         with st.spinner("正在生成函数实例, 勿点击任何按钮..."):
 
             # 7-5-2 控制面板的参数传入用于 eg 的生成 -------------------------------------------------------------------------
-
 
 
             np.random.seed(create_kwargs["x_seed"])
@@ -2503,7 +2598,6 @@ if use_data_type == use_data_options[0]:
 
             # 7-5-3 生成 eg ---------------------------------------------------------------------------------------------
 
-
             if use_x_piked:
 
                 x_eg_use = copy.deepcopy(x_eg)[x_picked_eg] # 坑爹的 df.copy
@@ -2512,90 +2606,13 @@ if use_data_type == use_data_options[0]:
                 x_eg_use = copy.deepcopy(x_eg)
 
             np.random.seed(create_kwargs["x_seed"])
+
             y_obs_eg = y_exp_eg + np.random.normal(size=y_exp_eg.shape[0], loc=0, scale=y_exp_eg.std() * create_noise)
+            y_df_eg = pd.DataFrame()
+            y_df_eg["y_exp"] = y_exp_eg
+            y_df_eg["y_obs"] = y_obs_eg
+
             x_eg_columns = x_eg.columns.tolist()
-
-
-        # 实现括号上色的程序1
-        def colorize_brackets_by_depth(expr: str) -> str:
-            """
-            对表达式中的括号进行着色，按嵌套层级循环使用不同颜色，
-            并正确处理 LaTeX 中指数符号（^）所需的大括号匹配问题。
-
-            参数:
-                expr (str): 传入的原始字符串表达式（例如 "y = 2(2(x_2)^2)^2"）
-
-            返回:
-                str: 添加 LaTeX 颜色标签后的表达式，可直接用于 st.latex() 渲染
-            """
-            colors = ['orange', 'red', 'blue', 'yellow', "green", "violet", 'brown', "lime"]
-            num_colors = len(colors)
-            result = ''  # 最终拼接的 LaTeX 字符串
-            depth = 0  # 括号嵌套深度
-            stack = []  # 颜色栈，用于匹配每个左括号的颜色
-            char_energy = np.array([])  # 存储每个 ^ 所在时的括号层级，用于后续决定在哪里闭合大括号
-            char_len = len(expr)
-
-            # 遍历每个字符
-            for i, char in enumerate(expr):
-
-                if char == '^':
-                    # 遇到 ^ 开启指数，追加 ^{ 并记录当前 depth
-                    result += '^' + '{'
-                    char_energy = np.append(char_energy, depth)
-
-                elif char == '(':
-                    # 左括号，根据当前 depth 上色并入栈
-                    color = colors[depth % num_colors]
-                    result += rf'\textcolor{{{color}}}{{(}}'
-                    stack.append(color)
-                    depth += 1
-
-                elif char == ')':
-
-                    # 右括号，先结束 ^ 开启的大括号（若满足闭合条件）
-
-                    if stack:
-                        color = stack.pop()
-                    else:
-                        color = colors[0]  # 兜底：括号不匹配时默认颜色
-
-                    # 统计在当前 depth 下应该关闭多少个 ^ 所开启的大括号
-                    energy_exhausted = char_energy >= depth - 1
-                    char_energy = char_energy[char_energy < depth - 1]
-
-                    # 加上当前层级右括号
-
-                    result += "}" * np.sum(energy_exhausted)  # 添加闭合括号
-                    depth -= 1
-                    result += rf'\textcolor{{{color}}}{{)}}'
-
-                else:
-                    # 普通字符直接加入结果
-                    result += char
-
-                # 若到达末尾，补齐所有未关闭的大括号
-                if i == char_len - 1:
-                    result += "}" * len(char_energy)
-
-            return result
-
-
-        # 实现括号上色的程序2
-        def apply_colored_brackets(expr: str) -> str:
-            """
-            对整个表达式按加号（+）分隔后逐段处理括号着色。
-
-            参数:
-                expr (str): 传入的表达式（例如 "y = 2(2(x_2)^2)^2 + sin(πx_1)"）
-
-            返回:
-                str: 添加括号颜色的完整表达式
-            """
-            terms = expr.split('+')
-            colored_terms = [colorize_brackets_by_depth(term.strip()) for term in terms]
-            return ' + '.join(colored_terms)
-
 
         formula_eg = 'y=' + '+'.join(list(X_eg.columns))
 
@@ -2625,6 +2642,8 @@ if use_data_type == use_data_options[0]:
 
         st.markdown("")
         st.markdown("")
+        st.markdown("")
+
         create_Formula_panel_1, create_Formula_sep_1, create_Formula_panel_2 = st.columns([.65,0.018, .35])
 
         # 独立与互作特征鉴别器(待升级)
@@ -2635,67 +2654,202 @@ if use_data_type == use_data_options[0]:
                     count += 1
             return count
 
-        with create_runinfo_panel:
 
-            st.subheader('DPLS 参数')
-            st.markdown('')
-            st.markdown('---')
-            st.markdown("")
-
-            # 读取颜色（默认浅色）
-
-            # 使用 expander 创建一个可折叠/展开的区域
-            DPLSR_param_dict_ = DPLSR_param_dict.copy()
-            DPLS_kwargs = param_controller(
-                param_list=['DPLSR'],
-                para_descriptions={'DPLSR': method_descriptions.get('DPLSR')},
-                param_controls={"DPLSR": DPLSR_param_dict_},
-                desc='方法',
-                a_copied_dict=True
-            )
-
-            if not DPLS_kwargs['DPLSR']["distance_pattern"]:
-                DPLS_kwargs['DPLSR']["distance_pattern"] = ['Euc']
-
-        # 7-5-5 打印样本的 X 与 y -----------------------------------------------------------------------------------------
+        # 读取颜色（默认浅色）
 
         with create_Formula_panel_1:
 
-
-            formula_panel1_col1, f_sep1, formula_panel1_col2 = st.columns([.738,0.025,.382])
-
-
-            with formula_panel1_col1:
-
-                st.markdown("")
-                st.markdown("")
-                render_section_title("来自函数的样本:")
-                with st.expander(f"**{x_eg.shape}**", expanded=True):
-                    st.markdown("---")
-                    st.dataframe(x_eg_use.copy(), height=795, hide_index=True)
-
+            formula_panel1_col1, f_sep1, formula_panel1_col2 = st.columns([.5, 0.025, .5])
 
             with formula_panel1_col2:
 
-                st.markdown("")
-                st.markdown("")
+                render_section_title('DPLS 参数')
+                # 使用 expander 创建一个可折叠/展开的区域
+                DPLSR_param_dict_ = DPLSR_param_dict.copy()
+                DPLS_kwargs = param_controller(
+                    param_list=['DPLSR'],
+                    para_descriptions={'DPLSR': method_descriptions.get('DPLSR')},
+                    param_controls={"DPLSR": DPLSR_param_dict_},
+                    desc='方法',
+                    a_copied_dict=True
+                )
 
-                y_df_eg = pd.DataFrame()
-                y_df_eg["y_exp"] = y_exp_eg
-                y_df_eg["y_obs"] = y_obs_eg
+                if not DPLS_kwargs['DPLSR']["distance_pattern"]:
+                    DPLS_kwargs['DPLSR']["distance_pattern"] = ['Euc']
 
-                render_section_title("Y of func")
-                with st.expander(f"**{y_df_eg.shape}** | PersonR^2 = {calculate_corr(y_exp_eg, y_obs_eg)[0]:.3f}", expanded=True):
+            with formula_panel1_col1:
+
+                render_section_title("参数与检测:")
+
+                create_exe_expander_2 = st.expander(f"**{formula_eg[:200]}**", expanded=True)
+
+                # 7-5-6-1 打印模拟样本的生成参数  -------------------------------------------------------------------------------
+
+                with create_exe_expander_2:
+
                     st.markdown("---")
-                    st.dataframe(y_df_eg, height=795, hide_index=True)
+                    # principle_col, f_sep2, execute_col = st.columns([1, 0.1, 1])
+                    #
+                    # with principle_col:
+                    #
+                    #     unrelated_num = 0 if use_x_piked else create_param_num - create_use_x_num
+                    #
+                    #     col_level = [count_unique_ai(x_name, x_eg_use.columns) for x_name in X_eg.columns]
+                    #
+                    #     indi_col = col_level.count(1)
+                    #     max_level = max(col_level)
+                    #
+                    #     render_dataset_title("自变量", 16)
+                    #
+                    #     principle_X = {
+                    #
+                    #         f"特征池 ": f"{create_param_num}",
+                    #         f"使用的X ": create_use_x_num,
+                    #         f"X的样本数": x_eg.shape[0],
+                    #     }
+                    #
+                    #     display_detial_dict(principle_X)
+                    #
+                    #     render_dataset_title("无关", 16)
+                    #
+                    #     principle_unrelated = {
+                    #
+                    #         f"无关的X数量": unrelated_num,
+                    #
+                    #     }
+                    #
+                    #     display_detial_dict(principle_unrelated)
+                    #
+                    #     render_dataset_title("互作", 16)
+                    #
+                    #     principle_react = {
+                    #
+                    #         "独立项数量": create_x_num,
+                    #         "互作项数量": create_xtox_num,
+                    #         "互作项最高参与项数": create_xtox_level,
+                    #     }
+                    #
+                    #     display_detial_dict(principle_react)
+                    #
+                    #     principle_redun = {
+                    #
+                    #         "是否开启冗余": "".join(["是" if create_redun else "否"]),
+                    #     }
+                    #
+                    #     render_dataset_title("冗余", 16)
+                    #     display_detial_dict(principle_redun)
+
+                    # 7-5-6-1 打印参数的检测结果  -------------------------------------------------------------------
+
+                    col_level = [count_unique_ai(x_name, x_eg_use.columns) for x_name in X_eg.columns]
+                    indi_col = col_level.count(1)
+                    iner_col = len(col_level) - indi_col
+                    max_level = max(col_level)
+
+                    unrelated_num = create_param_num - indi_col
+
+                    if unrelated_num > 0:
+                        with formular_title_sep:
+                            st.markdown(f"<div style='text-align: right; margin-top: -10px; padding-right: 20px;'> <span style='color: #3580f5; font-size:25px;'><strong> [{unrelated_num}] </strong></span>个未使用的自变量</div>", unsafe_allow_html=True)
+
+                    st.markdown("")
+
+                    x_use_xidx = [f'X_{x_eg_columns.index(x_i) + 1}' for x_i in x_picked_eg]
+                    x_use_idx = [x_eg_columns.index(x_i) + 1 for x_i in x_picked_eg]
+
+                    exe_X = {
+
+                        f"X池: {', '.join([f'x_{i + 1}' for i in range(create_param_num)])}": " " + "".join(
+                            ["✅" if create_param_num == create_param_num else "❌"]),
+                        f"{'使用X: ' + ', '.join(x_use_xidx)}": "  " + "".join(
+                            ["✅" if create_use_x_num == len(x_picked_eg) else "❌"]),
+                        f"样本数 {create_thresh_range}: {x_eg.shape[0]}": " " + "".join(
+                            ["✅" if (create_thresh_range[1] > x_eg.shape[0] > create_thresh_range[0]) else "❌"]),
+
+                    }
+
+                    display_detial_dict(exe_X)
+
+                    render_dataset_title("无关", 15)
+                    exe_unrelated = {
+
+                        f"检测到无关列={(x_eg_use.shape[1] - create_use_x_num)}": " " + "".join(
+                            ["✅" if unrelated_num == (x_eg_use.shape[1] - create_use_x_num) else "❌"]), }
+
+                    display_detial_dict(exe_unrelated)
+
+                    render_dataset_title("互作", 15)
+
+                    exe_react = {
+
+                        f"检测到独立项={indi_col}": " " + "".join(["✅" if (
+                                indi_col == create_x_num) else "❌"]),
+                        f"检测到互作项={X_eg.shape[1] - indi_col}": " " + "".join(["✅" if (
+                                X_eg.shape[1] - indi_col == create_xtox_num) else "❌"]),
+                        f"检测到的最高level={max_level}": " " + "".join(["✅" if (
+                                max_level <= create_xtox_level) else "❌"]),
+
+                    }
+
+                    display_detial_dict(exe_react)
+
+                    render_dataset_title("冗余", 15)
+
+                    redun_detected = any(x_use_idx_i > create_param_num for x_use_idx_i in x_use_idx)
+
+                    exe_redun = {
+
+                        "检测到冗余": "".join(["是" if redun_detected else "未检出"]),
+
+                    }
+
+                    display_detial_dict(exe_redun)
+
+                    if redun_detected:
+                        display_detial_dict({f'X_{x_eg_columns.index(x_i) + 1}': x_i[:50] for x_i in x_picked_eg if
+                                             x_eg_columns.index(x_i) > create_param_num - 1})
+
+                    st.markdown("")
+
+
+    with create_check_file_expander:
+
+        formula_x_col, formula_check_file_sep, formula_y_col = st.columns([.738, 0.025, .382])
+
+        with formula_x_col:
+
+            st.markdown("")
+            st.markdown("")
+            render_section_title("来自函数的自变量:")
+
+            with st.expander(f"**{x_eg.shape}**", expanded=True):
+
+                st.markdown("---")
+                st.dataframe(x_eg_use.copy(), height=795, hide_index=True)
+
+        with formula_y_col:
+            st.markdown("")
+            st.markdown("")
+
+            render_section_title("因变量")
+            with st.expander(f"**{y_df_eg.shape}** | PersonR^2 = {calculate_corr(y_exp_eg, y_obs_eg)[0]:.3f}",
+                             expanded=True):
+
+                st.markdown("---")
+                st.dataframe(y_df_eg, height=795, hide_index=True)
+
+
+        # 7-5-5 打印样本的 X 与 y -----------------------------------------------------------------------------------------
+
+
+
+
 
         # 7-5-6 打印模拟样本的生成参数 与 参数符合度的检测结果 ------------------------------------------------------------------
 
         with create_Formula_panel_2:
 
             # 使用 expander 创建一个可折叠/展开的区域
-            st.markdown("")
-            st.markdown("")
             render_section_title("DPLS Plots:")
 
 
@@ -2703,8 +2857,22 @@ if use_data_type == use_data_options[0]:
 
                 st.markdown("---")
 
-                blue_print = st.selectbox('切换打印的 y', options=['y_obs', 'y_exp'], key='blue_print')
-                enforce_P = st.slider("硬指派的 P: ", min_value=-1, max_value=DPLS_kwargs['DPLSR']['max_iter']-1, value=-1, key='enforce_P')
+                enforce_P = st.slider("硬定位的 P: ", min_value=-1, max_value=DPLS_kwargs['DPLSR']['max_iter']-1, value=-1, key='enforce_P')
+
+                plot_y_sep, plot_exp_col, plot_obs_col = st.columns([.58, 1.5, 1])
+
+                with plot_exp_col:
+
+                    print_exp = st.checkbox('y_exp', value=True, key='print_exp')
+
+                with plot_obs_col:
+
+                    print_obs = st.checkbox('y_obs', value=False, key='print_obs')
+
+                st.markdown("")
+
+
+            with st.expander("", expanded=True):
 
                 with st.spinner("正在拟合..."):
 
@@ -2750,56 +2918,80 @@ if use_data_type == use_data_options[0]:
 
                     x_eg_use_i[x_i] = pred_obj.X.copy()[:, x]
 
-                    if blue_print == 'y_obs':
+                    if print_exp:
 
-                        x_eg_use_i['y'] = y_df_eg['y_obs']
+                        x_eg_use_i['y_exp'] = y_df_eg['y_exp']
 
-                    else:
+                    if print_obs:
 
-                        x_eg_use_i['y'] = y_df_eg['y_exp']
+                        x_eg_use_i['y_obs'] = y_df_eg['y_obs']
 
                     x_eg_use_i['preds'] = y_pred  # 使用完整预测值
 
-                    # 创建基础散点图（x_i vs y，蓝色）
-                    fig = px.scatter(
-                        x_eg_use_i,
-                        x=x_i,
-                        y='y',
-                        labels={'x': x_i, 'y': 'target'},
-                        color_discrete_sequence=['#3580f5'],  # 直接指定蓝色
-                        opacity=0.82
-                    )
+                    # 创建一个空图
+                    fig = go.Figure()
 
-                    # 添加预测值散点（x_i vs preds，橙色）
+                    # 添加 y_exp（蓝色），优先添加以保证 preds 最上层
+                    if print_exp:
+                        fig.add_scatter(
+                            x=x_eg_use_i[x_i],
+                            y=x_eg_use_i['y_exp'],
+                            mode='markers',
+                            name='y_exp',
+                            marker=dict(
+                                color='#3580F5',
+                                size=6,
+                                opacity=0.75
+                            )
+                        )
+
+                    # 添加 y_obs（绿色）
+                    if print_obs:
+                        fig.add_scatter(
+                            x=x_eg_use_i[x_i],
+                            y=x_eg_use_i['y_obs'],
+                            mode='markers',
+                            name='y_obs',
+                            marker=dict(
+                                color='#079967',
+                                size=6,
+                                opacity=0.85
+                            )
+                        )
+
+                    # 最后添加 preds（橙色），确保在最上层
                     fig.add_scatter(
                         x=x_eg_use_i[x_i],
                         y=x_eg_use_i['preds'],
                         mode='markers',
-                        name='Predicted',
+                        name='preds',
                         marker=dict(
-                            color='#FFB420',  # 橙色
+                            color='#FFB420',
                             size=4.5,
-                            opacity=0.85
+                            opacity=0.82
                         )
                     )
 
-                    # 确保原始数据点的样式
-                    fig.update_traces(
-                        marker=dict(size=6),
-                        selector=dict(marker=dict(color='#3580f5'))  # 更精确的选择器
+                    # 更新坐标轴标签
+                    fig.update_layout(
+                        xaxis_title=x_i,
+                        yaxis_title='target',
+                        legend=dict(
+                            traceorder="normal"  # 图例顺序按添加顺序排列
+                        )
                     )
 
                     # 更新布局
                     fig.update_layout(
                         title=dict(
-                            text=f"x_{x_eg_columns.index(x_i) + 1} vs y, R:{R:.2f}, P: {P+1}<span style='color:#76B900'><b> </b></span>",
-                            x=0.35,  # 居中，可调
+                            text=f"[x_{x_eg_columns.index(x_i) + 1}] [P: {P+1}] [R: {R:.2f}]-[PrsR:{calculate_corr(y_exp_eg, y_obs_eg)[0]:.2f}]",
+                            x=0.55,  # 居中，可调
                             xanchor='right',
                             font=dict(size=19),
                         ),
                         showlegend=False,
-                        height=370,
-                        margin=dict(t=30, b=30, l=10, r=10),
+                        height=430,
+                        margin=dict(t=40, b=10, l=7, r=10),
                         paper_bgcolor='rgba(0,0,0,0)',
                         plot_bgcolor='rgba(0,0,0,0)',
                         xaxis=dict(showgrid=False, zeroline=False, showline=False, ticks='', showticklabels=True),
@@ -2825,134 +3017,8 @@ if use_data_type == use_data_options[0]:
 # 7-6 Plot 区域 ---------------------------------------------------------------------------------------------------------
 
 
-    with create_runinfo_panel:
 
 
-        render_section_title("参数与检测:")
-
-        create_exe_expander_2 = st.expander(f"**{formula_eg[:200]}**", expanded=True)
-
-        # 7-5-6-1 打印模拟样本的生成参数  -------------------------------------------------------------------------------
-
-        with create_exe_expander_2:
-            st.markdown("---")
-            # principle_col, f_sep2, execute_col = st.columns([1, 0.1, 1])
-            #
-            # with principle_col:
-            #
-            #     unrelated_num = 0 if use_x_piked else create_param_num - create_use_x_num
-            #
-            #     col_level = [count_unique_ai(x_name, x_eg_use.columns) for x_name in X_eg.columns]
-            #
-            #     indi_col = col_level.count(1)
-            #     max_level = max(col_level)
-            #
-            #     render_dataset_title("自变量", 16)
-            #
-            #     principle_X = {
-            #
-            #         f"特征池 ": f"{create_param_num}",
-            #         f"使用的X ": create_use_x_num,
-            #         f"X的样本数": x_eg.shape[0],
-            #     }
-            #
-            #     display_detial_dict(principle_X)
-            #
-            #     render_dataset_title("无关", 16)
-            #
-            #     principle_unrelated = {
-            #
-            #         f"无关的X数量": unrelated_num,
-            #
-            #     }
-            #
-            #     display_detial_dict(principle_unrelated)
-            #
-            #     render_dataset_title("互作", 16)
-            #
-            #     principle_react = {
-            #
-            #         "独立项数量": create_x_num,
-            #         "互作项数量": create_xtox_num,
-            #         "互作项最高参与项数": create_xtox_level,
-            #     }
-            #
-            #     display_detial_dict(principle_react)
-            #
-            #     principle_redun = {
-            #
-            #         "是否开启冗余": "".join(["是" if create_redun else "否"]),
-            #     }
-            #
-            #     render_dataset_title("冗余", 16)
-            #     display_detial_dict(principle_redun)
-
-            # 7-5-6-1 打印参数的检测结果  -------------------------------------------------------------------
-
-            col_level = [count_unique_ai(x_name, x_eg_use.columns) for x_name in X_eg.columns]
-            indi_col = col_level.count(1)
-            iner_col =  len(col_level)-indi_col
-            max_level = max(col_level)
-
-            unrelated_num = create_param_num - indi_col
-
-            render_dataset_title("自变量", 14.8)
-
-            x_use_xidx = [f'X_{x_eg_columns.index(x_i) + 1}' for x_i in x_picked_eg]
-            x_use_idx = [x_eg_columns.index(x_i) + 1 for x_i in x_picked_eg]
-
-            exe_X = {
-
-                f"X池: {', '.join([f'x_{i + 1}' for i in range(create_param_num)])}": " " + "".join(
-                    ["✅" if create_param_num == create_param_num else "❌"]),
-                f"{'使用X: '+', '.join(x_use_xidx)}": "  " + "".join(["✅" if create_use_x_num == len(x_picked_eg) else "❌"]),
-                f"样本数 {create_thresh_range}: {x_eg.shape[0]}": " " + "".join(
-                    ["✅" if (create_thresh_range[1] > x_eg.shape[0] > create_thresh_range[0]) else "❌"]),
-
-            }
-
-            display_detial_dict(exe_X)
-
-            render_dataset_title("无关", 14.8)
-            exe_unrelated = {
-
-                f"检测到无关列={(x_eg_use.shape[1] - create_use_x_num)}": " " + "".join(
-                    ["✅" if unrelated_num == (x_eg_use.shape[1] - create_use_x_num) else "❌"]), }
-
-            display_detial_dict(exe_unrelated)
-
-            render_dataset_title("互作", 14.8)
-
-            exe_react = {
-
-                f"检测到独立项={indi_col}": " " + "".join(["✅" if (
-                        indi_col == create_x_num) else "❌"]),
-                f"检测到互作项={X_eg.shape[1] - indi_col}": " " + "".join(["✅" if (
-                        X_eg.shape[1] - indi_col == create_xtox_num) else "❌"]),
-                f"检测到的最高level={max_level}": " " + "".join(["✅" if (
-                        max_level <= create_xtox_level) else "❌"]),
-
-            }
-
-            display_detial_dict(exe_react)
-
-            render_dataset_title("冗余", 14.8)
-
-            redun_detected = any(x_use_idx_i > create_param_num for x_use_idx_i in x_use_idx)
-
-            exe_redun = {
-
-                "检测到冗余": "".join(["是" if redun_detected else "未检出"]),
-
-            }
-
-            display_detial_dict(exe_redun)
-
-            if redun_detected:
-                display_detial_dict({f'X_{x_eg_columns.index(x_i) + 1}': x_i[:50] for x_i in x_picked_eg if
-                                     x_eg_columns.index(x_i) > create_param_num - 1})
-
-            st.markdown("")
 
         # 7-6-1 拟合X与y_obs的 DPLS_obj  -----------------------------------------------------------------------------
 
