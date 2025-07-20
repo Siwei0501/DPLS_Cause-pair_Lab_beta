@@ -357,6 +357,25 @@ def param_controller(param_list: list, para_descriptions: dict, param_controls: 
                                 key=key_name
                             )
 
+                    elif control["type"] == "select_slider":
+
+                        if "help" in control:
+
+                            param_kwargs[param][param_key] = st.select_slider(
+                                control["label"],
+                                options=control["options"],
+                                value=control.get("value", []),
+                                key=key_name,
+                                help=control["help"],
+                            )
+                        else:
+                            param_kwargs[param][param_key] = st.select_slider(
+                                control["label"],
+                                options=control["options"],
+                                value=control.get("value", []),
+                                key=key_name
+                            )
+
 
 
         else:
@@ -444,13 +463,13 @@ def display_detial_dict(d: dict, font_size: int = 16, font_weight: int = 315, ma
     }
     @media (prefers-color-scheme: dark) {
         .custom-dict-box {
-            background-color: #132150 !important;
+            background-color: #121844 !important;
             color: white !important;
-            border-color: #132150 !important;
+            border-color: #121844 !important;
         }
     }
     </style>
-    """, unsafe_allow_html=True)
+    """, unsafe_allow_html=True) # #111638
 
     # 渲染每个键值对，样式写在class里，动态样式靠CSS控制
 
@@ -481,11 +500,25 @@ def display_detial_dict(d: dict, font_size: int = 16, font_weight: int = 315, ma
         """, unsafe_allow_html=True)
 
 # 带下划线的副标题
-def render_section_title(text: str, align="left", font_size=20, line_color='#3580f5'):
+def render_section_title(
+        text: str,
+        align="left",
+        font_size=20,
+        line_color='#3580f5',
+        underline: bool = True
+):
     """
-    渲染一个美观的标题组件，带有下划线装饰，并自动适配亮/暗色主题。
+    渲染一个美观的标题组件，可选是否带下划线，并自动适配亮/暗色主题。
+
+    参数：
+    - text: 标题文本
+    - align: 对齐方式，'left' 或 'center'
+    - font_size: 字体大小（单位：px）
+    - line_color: 下划线颜色（如启用下划线）
+    - underline: 是否显示下划线（默认 True）
     """
     alignment_css = "margin: 0 auto;" if align == "center" else "margin-left: 7px;"
+    underline_css = f"border-bottom: 4.2px solid {line_color}; border-radius: 1.5px;" if underline else ""
 
     st.markdown(f"""
         <style>
@@ -497,9 +530,7 @@ def render_section_title(text: str, align="left", font_size=20, line_color='#358
             display: block;
             width: fit-content;
             {alignment_css}
-
-            border-bottom: 4.2px solid {line_color};
-            border-radius: 1.5px;
+            {underline_css}
             color: #ffffff;
         }}
 
@@ -512,6 +543,48 @@ def render_section_title(text: str, align="left", font_size=20, line_color='#358
 
         <div class="section-title">{text}</div>
     """, unsafe_allow_html=True)
+
+
+def render_noline_title(
+        text: str,
+        font_size=17,
+        line_color='#3580f5',
+        underline: bool = True
+):
+    """
+    渲染一个美观的标题组件，可选是否带下划线，并自动适配亮/暗色主题。
+
+    参数：
+    - text: 标题文本
+    - align: 对齐方式，'left' 或 'center'
+    - font_size: 字体大小（单位：px）
+    - line_color: 下划线颜色（如启用下划线）
+    - underline: 是否显示下划线（默认 True）
+    """
+
+    st.markdown(f"""
+        <style>
+        .section-noline_title {{
+            font-size: {font_size}px;
+            font-weight: 500;
+            text-align: left;
+            padding-bottom: 0px;
+            display: block;
+            width: fit-content;
+            color: #e0e0e0;
+            margin-top: 7px;
+        }}
+
+        @media (prefers-color-scheme: light) {{
+            .section-noline_title {{
+                color: #404040;
+            }}
+        }}
+        </style>
+
+        <div class="section-noline_title">{text}</div>
+    """, unsafe_allow_html=True)
+
 
 
 # 网页副分割线
@@ -611,7 +684,7 @@ xtox_func_dict = {
 
 
 # 网页名字
-st.set_page_config(page_title="DPLS-Cause lab", layout="wide")
+st.set_page_config(page_title="DPLS Cause-pair Lab", layout="wide")
 
 # 网页主标题及 Cause 动画
 st.markdown("""
@@ -1185,7 +1258,7 @@ preprocess_param_controls = {
         "min": 1, "max": 500, "value": 20
     },
     "R_mode": {
-        "type": "selectbox",
+        "type": "selectslider",
         "label": "求R模式",
         "help": "[fusion]: 返回整个样本集的DPLSR, [single]: 返回每列的DPLSR",
         "options": ['fusion', 'single'],
@@ -1303,19 +1376,13 @@ DPLSR_param_dict = {
         "value": 20
     },
     "R_mode": {
-        "type": "selectbox",
+        "type": "select_slider",
         "label": "求R模式",
         "help": "[fusion]: 返回整个样本集的DPLSR, [single]: 返回每列的DPLSR",
         "options": ['fusion', 'single'],
         "value": 'fusion'
     },
-    "distance_pattern": {
-        "type": "multiselect",
-        "label": "核函数",
-        "help": "[Euc]:欧氏距离. [Mah]:曼哈顿距离, [Pairs]:成对组合距离, [Ming]:闵氏距离",
-        "options": ["Euc", 'Mah', 'Pairs', 'Ming'],
-        "value": "Euc"
-    },
+
     "fit_mode": {
         "type": "selectbox",
         "label": "Fit-矫正模式",
@@ -1323,6 +1390,15 @@ DPLSR_param_dict = {
         "options": ["Fit", 'CV', 'Fit_rectify'],
         "value": "Fit_rectify"
     },
+
+    "distance_pattern": {
+        "type": "multiselect",
+        "label": "核函数",
+        "help": "[Euc]:欧氏距离. [Mah]:曼哈顿距离, [Pairs]:成对组合距离, [Ming]:闵氏距离",
+        "options": ["Euc", 'Mah', 'Pairs', 'Ming'],
+        "value": "Euc"
+    },
+
 
     "fit_intercept": {
         "type": "checkbox",
@@ -1862,7 +1938,9 @@ with host_panel_setting:
             </div>
             """, unsafe_allow_html=True)
 
-            st.markdown("---")
+            st.markdown("""
+                <hr style="margin-top: 35px; border: none; border-top: 1px solid #d3d3d3;" />
+            """, unsafe_allow_html=True)
 
         # 7-2-2 与 本地文件模式共用的功能部分 --------------------------------------------------------------------------------
 
@@ -2032,6 +2110,164 @@ if use_data_type == use_data_options[0]:
 
     create_check_file_expander = st.expander("检视预览函数样本", expanded=False)
 
+    # 实现括号上色的程序1
+    def colorize_brackets_by_depth(expr: str) -> str:
+        """
+        对表达式中的括号进行着色，按嵌套层级循环使用不同颜色，
+        并正确处理 LaTeX 中指数符号（^）所需的大括号匹配问题。
+
+        参数:
+            expr (str): 传入的原始字符串表达式（例如 "y = 2(2(x_2)^2)^2"）
+
+        返回:
+            str: 添加 LaTeX 颜色标签后的表达式，可直接用于 st.latex() 渲染
+        """
+        colors = ['orange', 'red', 'blue', 'yellow', "green", "violet", 'brown', "lime"]
+        num_colors = len(colors)
+        result = ''  # 最终拼接的 LaTeX 字符串
+        depth = 0  # 括号嵌套深度
+        stack = []  # 颜色栈，用于匹配每个左括号的颜色
+        char_energy = np.array([])  # 存储每个 ^ 所在时的括号层级，用于后续决定在哪里闭合大括号
+        char_len = len(expr)
+
+        # 遍历每个字符
+        for i, char in enumerate(expr):
+
+            if char == '^':
+                # 遇到 ^ 开启指数，追加 ^{ 并记录当前 depth
+                result += '^' + '{'
+                char_energy = np.append(char_energy, depth)
+
+            elif char == '(':
+                # 左括号，根据当前 depth 上色并入栈
+                color = colors[depth % num_colors]
+                result += rf'\textcolor{{{color}}}{{(}}'
+                stack.append(color)
+                depth += 1
+
+            elif char == ')':
+
+                # 右括号，先结束 ^ 开启的大括号（若满足闭合条件）
+
+                if stack:
+                    color = stack.pop()
+                else:
+                    color = colors[0]  # 兜底：括号不匹配时默认颜色
+
+                # 统计在当前 depth 下应该关闭多少个 ^ 所开启的大括号
+                energy_exhausted = char_energy >= depth - 1
+                char_energy = char_energy[char_energy < depth - 1]
+
+                # 加上当前层级右括号
+
+                result += "}" * np.sum(energy_exhausted)  # 添加闭合括号
+                depth -= 1
+                result += rf'\textcolor{{{color}}}{{)}}'
+
+            else:
+                # 普通字符直接加入结果
+                result += char
+
+            # 若到达末尾，补齐所有未关闭的大括号
+            if i == char_len - 1:
+                result += "}" * len(char_energy)
+
+        return result
+
+
+    # 实现括号上色的程序2
+    def apply_colored_brackets(expr: str) -> str:
+        """
+        对整个表达式按加号（+）分隔后逐段处理括号着色。
+
+        参数:
+            expr (str): 传入的表达式（例如 "y = 2(2(x_2)^2)^2 + sin(πx_1)"）
+
+        返回:
+            str: 添加括号颜色的完整表达式
+        """
+        terms = expr.split('+')
+        colored_terms = [colorize_brackets_by_depth(term.strip()) for term in terms]
+        return ' + '.join(colored_terms)
+
+    with create_preview_panel:
+
+        st.subheader('模拟样本预览区')
+        st.markdown('')
+        st.markdown('---')
+        st.markdown("")
+
+        # 7-5-1 定义内容区 -----------------------------------------------------------------------------------------------
+
+        formular_refresh_col, formular_sep_1, formular_title_add_x, add_x_col, minus_x_col,  formular_sep_2, formular_title_add_xtox, add_xtox_col, minus_xtox_col, formular_sep_3  = st.columns([.6, .3, .75, .21, .21, .3, .75, .21, .21, 3.5])
+
+        # with formular_title_col:
+        #     render_section_title("你的函数 be like :", underline=False)
+
+        with formular_refresh_col:
+            f_refresh_button = st.button("**⇄**", use_container_width=True)
+            if f_refresh_button:
+
+                st.session_state["formular_refresh"]= True
+
+                st.rerun()
+
+        with formular_sep_1:
+
+            st.markdown("""
+                <div style="
+                    width: 1px;
+                    height: 50px;
+                    background-color: #cccccc;
+                    margin: auto;
+                    margin-top: -5px;
+                "></div>
+            """, unsafe_allow_html=True)
+
+        with formular_title_add_x:
+
+            render_noline_title("快速添加一个独立项")
+
+        st.session_state['add_x'] = False
+        st.session_state['add_xtox'] = False
+        st.session_state['minus_x'] = False
+        st.session_state['minus_xtox'] = False
+
+        with add_x_col:
+            add_x = st.button("＋", key="add_x_b")
+            if add_x:
+                st.session_state["add_x"] = True
+
+        with minus_x_col:
+            minus_x = st.button("－", key="minus_x_b")
+            if minus_x:
+                st.session_state["minus_x"] = True
+
+        with formular_sep_2:
+
+            st.markdown("""
+                <div style="
+                    width: 1px;
+                    height: 50px;
+                    background-color: #cccccc;
+                    margin: auto;
+                    margin-top: -5px;
+                "></div>
+            """, unsafe_allow_html=True)
+
+        with formular_title_add_xtox:
+            render_noline_title("快速添加一个互作项")
+        with add_xtox_col:
+            add_xtox = st.button("＋", key="add_xtox_b")
+            if add_xtox:
+                st.session_state["add_xtox"] = True
+        with minus_xtox_col:
+            minus_xtox = st.button("－", key="minus_xtox_b")
+            if minus_xtox:
+                st.session_state["minus_xtox"] = True
+
+
+
     with create_control_panel:
 
         st.subheader('函数控制面板')
@@ -2040,13 +2276,62 @@ if use_data_type == use_data_options[0]:
         st.markdown("")
 
         create_data_expander = st.expander('**生成模拟数据**', expanded=True)
+        
+        create_help_dict = {
+
+            "create_param_num":'这个参数决定 [特征池] 的大小,  参与 [y] 构成的那些自变量 [X] 将会在池中选择, 池中剩余的 [特征] 为[无关特征]',
+            "create_use_x_num": "从 [特征池] 内取用的 [X] 的数量, 取用 [X] 数量 ≤ [特征池]大小",
+            "create_x_num": "此参数定义了构成 [y] 的函数关系内有多少独立项, 如 [y = x_1 + x_1^2 + x_2 + (x_1×x_2)],  \n"
+                                                        "此时 [独立项] = 3 (即除 (x_1×x_2) 项以外的项, 他们仅由一个 [x] 决定), 注意到这里出现了重复的 [x]: x_1,"
+                                                        "因为此参数不关注 [x] 是否重复,  \n但受参数: [使用的X数量] 的约束, "
+                                                        "因为被标记为需要使用的 [X] 必须在 [y] 的公式中至少出现一次, ",
+
+            "create_redun":"如果此项为 [True], 则可以有 [x非独立生成], 以下提到的情况就是 [合理] 的:  \n"
+                                                     " 设参数 [独立项数量] = 3 , 生成的函数关系为 [y=x_1 + 2×x_2 + 3×x_3]"
+                                                     " 表面上 [3×x_3] 这一项仅由 [x_3]构成, 因此被视为 [独立项], "
+                                                     "但 [x_3] 由关系: [x_3=x_1×x_2] 约束, 所以 [真实] 的函数关系为  \n"
+                                                     " [y=x_1 + 2×x_2 + 3×(x_1×x_2))],实际上只有两个 [X]参与了函数关系  \n"
+                                                     "[⚠️激进的参数]: 此项将会显著增加函数复杂度  \n"
+                                                     "[⚡不受控的参数]: 开启此项后, 将不受随机种子控制",
+            
+            "create_xtox_num": "此参数定义了构成 [y] 的函数关系内有多少互作项, 互作列是指由[多个X]影响的列,"
+                                                                   " 只会由选择为[使用的X]构成,  \n如 [y = x_1 + x_1^2 + x_2 + (x_1×x_2)], "
+                                                                "此时 [互作项] = 1",
+            
+            "create_xtox_level":"此项只限制了每个互作项的 [最高参与项数], 而 [不一定] 得到最高参与项,  \n"
+                                                             "如设置此项数为 4, 得到 [x_3=x_1×x_2×(x_2-x_1)], 此时 [x_3] 的项数 [=4],  \n"
+                                                             "但是更换随机种子得到 [x_3=x_1×x_2], 此时 [2<=4], 是合理的.  \n"
+                                                             "[总结]: 当此项设为 [n] 时, 将不会超过参与项超过 [n] 的 [互作项]",
+
+            "create_funcseed": "输入x数量后, 每个x被分到一个f构成f(x), f不一定一样, 随机种子用于决定这些 f",
+
+            "create_x_bank":                                            "'正弦函数': f'sin(πx)',  \n"
+                                           "'余弦函数': f'cos(πx)'  \n"
+                                           "'二次函数': f'2(x)^2',  \n"
+                                           "'平方根函数': f'sqrt(x)',  \n"
+                                           "'指数函数': f'e^x',  \n"
+                                           "'对数函数（平移）': f'log(x+1)',  \n"
+                                           "'对数函数（加偏移防负值）': f'log(x)',  \n"
+                                           "'Sigmoid 函数': f'1/(1+e^-6x)',  \n"
+                                           "'三次多项式函数': f'2x^3+x^2-2x',  \n"
+                                           "'指数幂函数': f'2^5(x+1)',  \n"
+                                           "'高频正弦函数': f'sin(2πx)',  \n"
+                                           "'混合三角+线性函数': f'1/5×sin(4x)+(11/10)×x',  \n"
+                                           "'高频正弦 + 线性项': f'sin(5πx)+x',  \n"
+                                           "'高频余弦函数': f'cos(6πx)',  \n"
+                                           "'高频正弦线性混合函数': f'1/10×sin(10.6×f)+(11/10)×x',  \n"
+                                           "'非线性频率余弦函数': f'cos(5πx(x+1))',  \n"
+                                           "'非线性频率正弦函数': f'sin(4πx(x+1))'  \n",
+            
+        }
+        
         with create_data_expander:
 
             # 7-2-3-1 无关功能 -------------------------------------------------------------------------------------------
 
             st.markdown('---')
 
-            unrelated_expander = st.expander("无关", expanded=True)
+            unrelated_expander = st.expander("**无关**", expanded=True)
 
             with unrelated_expander:
 
@@ -2056,60 +2341,63 @@ if use_data_type == use_data_options[0]:
 
                     create_interact_num = st.number_input("无关的X数量", min_value=0, max_value=20, step=1, value=0,
                                                        key="create_param_num",
-                                                       help='这个参数决定 [特征池] 的大小,  参与 [y] 构成的那些自变量 [X] 将会在池中选择, 池中剩余的 [特征] 为[无关特征]',
+                                                       help=create_help_dict.get("create_param_num","无描述")
                                                        )
 
                 with create_use_x_col:
 
-                    create_use_x_num = st.number_input("使用的X数量", min_value=1,
-                                                       max_value=20,
-                                                       step=1, value=2, key="create_use_x_num",
-                                                       help="从 [特征池] 内取用的 [X] 的数量, 取用 [X] 数量 ≤ [特征池]大小"
-                                                       )
+                    if "create_use_x_num" in st.session_state:
 
-                    # if "create_x_num" in st.session_state:
-                    #
-                    #     if "create_xtox_num" in st.session_state:
-                    #
-                    #         use_min_limit = st.session_state["create_x_num"] + 2*st.session_state["create_xtox_num"]
-                    #
-                    #     else:
-                    #         use_min_limit = st.session_state["create_x_num"]
-                    #
-                    # else:
-                    #     use_min_limit = 1
-                    #
-                    #
-                    # if "create_use_x_num" in st.session_state:
-                    #
-                    #     if use_min_limit < st.session_state["create_use_x_num"]:
-                    #
-                    #         create_use_x_num = st.number_input("使用的X数量", min_value=use_min_limit, max_value=20,
-                    #                                            step=1, value=st.session_state["create_use_x_num"], key="create_use_x_num",
-                    #                                            help="从 [特征池] 内取用的 [X] 的数量, 取用 [X] 数量 ≤ [特征池]大小"
-                    #                                           )
-                    #
-                    #     else:
-                    #
-                    #         create_use_x_num = st.number_input("使用的X数量", min_value=use_min_limit, max_value=20,
-                    #                                            step=1, value=use_min_limit, key="create_use_x_num",
-                    #                                            help="从 [特征池] 内取用的 [X] 的数量, 取用 [X] 数量 ≤ [特征池]大小"
-                    #                                           )
-                    #
-                    # else:
-                    #
-                    #     create_use_x_num = st.number_input("使用的X数量", min_value=use_min_limit,
-                    #                                        max_value=20,
-                    #                                        step=1, value=2, key="create_use_x_num",
-                    #                                        help="从 [特征池] 内取用的 [X] 的数量, 取用 [X] 数量 ≤ [特征池]大小"
-                    #                                        )
+                        if st.session_state.get("add_x", False) or st.session_state.get("add_xtox", False):
+
+                            create_use_x_num = st.number_input("使用的X数量", min_value=1,
+                                                               max_value=20,
+                                                               step=1, value=st.session_state["create_use_x_num"]+1, key="create_use_x_num",
+                                                               help=create_help_dict.get("create_use_x_num", "无描述"),
+                                                               )
+
+                        elif st.session_state.get("minus_x", False) or st.session_state.get("minus_xtox", False):
+
+                            if st.session_state["create_use_x_num"] > 1:
+                                create_use_x_num = st.number_input("使用的X数量", min_value=1,
+                                                                   max_value=20,
+                                                                   step=1, value=st.session_state["create_use_x_num"]-1, key="create_use_x_num",
+                                                                   help=create_help_dict.get("create_use_x_num", "无描述"),
+                                                                   )
+                            else:
+
+                                create_use_x_num = st.number_input("使用的X数量", min_value=1,
+                                                                   max_value=20,
+                                                                   step=1, value=1, key="create_use_x_num",
+                                                                   help=create_help_dict.get("create_use_x_num", "无描述"),
+                                                                   )
+
+                        else:
+
+                            create_use_x_num = st.number_input("使用的X数量", min_value=1,
+                                                               max_value=20,
+                                                               step=1, value=st.session_state["create_use_x_num"], key="create_use_x_num",
+                                                               help=create_help_dict.get("create_use_x_num", "无描述"),
+                                                               )
+
+
+
+                    else:
+
+                        create_use_x_num = st.number_input("使用的X数量", min_value=1,
+                                                           max_value=20,
+                                                           step=1, value=2, key="create_use_x_num",
+                                                           help=create_help_dict.get("create_use_x_num", "无描述"),
+                                                           )
+
+
 
 
                     create_param_num = create_interact_num + create_use_x_num
 
             # 7-2-3-2 冗余功能 -------------------------------------------------------------------------------------------
 
-            redun_expander = st.expander("冗余", expanded=True)
+            redun_expander = st.expander("**冗余**", expanded=True)
 
             with redun_expander:
 
@@ -2117,52 +2405,57 @@ if use_data_type == use_data_options[0]:
 
                 with create_x_num_col:
 
-                    if "create_xtox_num" in st.session_state and st.session_state["create_xtox_num"]==0:
 
-                        if "create_x_num" in st.session_state:
-
-                            create_x_value=st.session_state["create_x_num"]
-
-                        else:
-
-                            create_x_value = 1
+                    if st.session_state.get("create_xtox_num", 0) == 0:
 
                         create_x_limit = 1
 
-                    elif "create_x_num" in st.session_state:
-
-                        create_x_value = st.session_state["create_x_num"]
+                    else:
                         create_x_limit = 0
+                    
+                    if "create_x_num" in st.session_state:
+
+                        if st.session_state.get("add_x", False):
+
+                            create_x_num = st.number_input("独立项数量", min_value=create_x_limit, max_value=10, step=1,
+                                                              value=st.session_state["create_x_num"] + 1,
+                                                              key="create_x_num",
+                                                              help=create_help_dict.get("create_x_num", "无描述"),
+                                                              )
+
+                        elif st.session_state.get("minus_x", False) and st.session_state["create_x_num"] > create_x_limit:
+
+                            create_x_num = st.number_input("独立项数量", min_value=create_x_limit, max_value=10, step=1,
+                                                              value=st.session_state["create_x_num"] - 1,
+                                                              key="create_x_num",
+                                                              help=create_help_dict.get("create_x_num", "无描述"),
+                                                              )
+
+                        else:
+
+                            create_x_num = st.number_input("独立项数量", min_value=create_x_limit, max_value=10, step=1,
+                                                              value=st.session_state["create_x_num"],
+                                                              key="create_x_num",
+                                                              help=create_help_dict.get("create_x_num", "无描述"),
+                                                              )
+
                     else:
 
-                        create_x_value=2
-                        create_x_limit = 0
-
-                    create_x_num = st.number_input("独立项数量", min_value=create_x_limit, max_value=20, step=1,
-                                                   value=create_x_value,
-                                                   key="create_x_num",
-                                                   help="此参数定义了构成 [y] 的函数关系内有多少独立项, 如 [y = x_1 + x_1^2 + x_2 + (x_1×x_2)],  \n"
-                                                        "此时 [独立项] = 3 (即除 (x_1×x_2) 项以外的项, 他们仅由一个 [x] 决定), 注意到这里出现了重复的 [x]: x_1,"
-                                                        "因为此参数不关注 [x] 是否重复,  \n但受参数: [使用的X数量] 的约束, "
-                                                        "因为被标记为需要使用的 [X] 必须在 [y] 的公式中至少出现一次, "
-
-                                                   )
+                        create_x_num = st.number_input("独立项数量", min_value=0, max_value=20, step=1,
+                                                       value=2,
+                                                       key="create_x_num",
+                                                       help=create_help_dict["create_x_num"],
+                                                       )
 
 
                 with create_redun_col:
 
                     create_redun = st.selectbox("**开启冗余** ⚠️", [False, True], key="create_redun",
-                                                help="如果此项为 [True], 则可以有 [x非独立生成], 以下提到的情况就是 [合理] 的:  \n"
-                                                     " 设参数 [独立项数量] = 3 , 生成的函数关系为 [y=x_1 + 2×x_2 + 3×x_3]"
-                                                     " 表面上 [3×x_3] 这一项仅由 [x_3]构成, 因此被视为 [独立项], "
-                                                     "但 [x_3] 由关系: [x_3=x_1×x_2] 约束, 所以 [真实] 的函数关系为  \n"
-                                                     " [y=x_1 + 2×x_2 + 3×(x_1×x_2))],实际上只有两个 [X]参与了函数关系  \n"
-                                                     "[⚠️激进的参数]: 此项将会显著增加函数复杂度  \n"
-                                                     "[⚡不受控的参数]: 开启此项后, 将不受随机种子控制")
+                                                help=create_help_dict.get("create_redun", "无描述"),)
 
             # 7-2-3-3互作功能 --------------------------------------------------------------------------------------------
 
-            interaction_expander = st.expander("互作", expanded=True)
+            interaction_expander = st.expander("**互作**", expanded=True)
 
             with interaction_expander:
 
@@ -2171,46 +2464,58 @@ if use_data_type == use_data_options[0]:
 
                 with create_xtox_num_col:
 
-                    if "create_xtox_num" in st.session_state and create_x_num == 0:
+                    if st.session_state.get("create_x_num", 2) == 0:
 
-                        create_xtox_num = st.number_input("互作项数量", min_value=1, max_value=10, step=1, value=st.session_state["create_xtox_num"],
-                                                          key="create_xtox_num",
-                                                          help="此参数定义了构成 [y] 的函数关系内有多少互作项, 互作列是指由[多个X]影响的列,"
-                                                               " 只会由选择为[使用的X]构成,  \n如 [y = x_1 + x_1^2 + x_2 + (x_1×x_2)], "
-                                                            "此时 [互作项] = 1"
-                                                          )
-
-
-                    elif "create_xtox_num" in st.session_state:
-                        create_xtox_num = st.number_input("互作项数量", min_value=0, max_value=10, step=1, value=st.session_state["create_xtox_num"],
-                                                          key="create_xtox_num",
-                                                          help="此参数定义了构成 [y] 的函数关系内有多少互作项, 互作列是指由[多个X]影响的列,"
-                                                               " 只会由选择为[使用的X]构成,  \n如 [y = x_1 + x_1^2 + x_2 + (x_1×x_2)], "
-                                                            "此时 [互作项] = 1"
-                                                          )
+                        create_xtox_limit = 1
 
                     else:
-                        create_xtox_num = st.number_input("互作项数量", min_value=0, max_value=10, step=0, value=0,
-                                                          key="create_xtox_num",
-                                                          help="此参数定义了构成 [y] 的函数关系内有多少互作项, 互作列是指由[多个X]影响的列,"
-                                                               " 只会由选择为[使用的X]构成,  \n如 [y = x_1 + x_1^2 + x_2 + (x_1×x_2)], "
-                                                            "此时 [互作项] = 1"
-                                                          )
+                        create_xtox_limit = 0
 
+
+                    if "create_xtox_num" in st.session_state:
+
+
+                        if st.session_state.get("add_xtox", False):
+
+                            create_xtox_num = st.number_input("互作项数量", min_value=create_xtox_limit, max_value=10, step=1,
+                                                              value=st.session_state["create_xtox_num"] + 1,
+                                                              key="create_xtox_num",
+                                                              help=create_help_dict.get("create_xtox_num", "无描述"),
+                                                              )
+
+                        elif st.session_state.get("minus_xtox", False) and st.session_state["create_xtox_num"] > create_xtox_limit:
+
+                            create_xtox_num = st.number_input("互作项数量", min_value=create_xtox_limit, max_value=10, step=1,
+                                                              value=st.session_state["create_xtox_num"] - 1,
+                                                              key="create_xtox_num",
+                                                              help=create_help_dict.get("create_xtox_num", "无描述"),
+                                                              )
+
+                        else:
+
+                            create_xtox_num = st.number_input("互作项数量", min_value=create_xtox_limit, max_value=10, step=1,
+
+                                                              value=st.session_state["create_xtox_num"],
+                                                              key="create_xtox_num",
+                                                              help=create_help_dict.get("create_xtox_num", "无描述"),
+                                                              )
+
+                    else:
+                        create_xtox_num = st.number_input("互作项数量", min_value=create_xtox_limit, max_value=10, step=0, value=0,
+                                                          key="create_xtox_num",
+                                                          help=create_help_dict.get("create_xtox_num", "无描述"),
+                                                          )
 
                 with create_xtox_level_col:
 
                     create_xtox_level = st.number_input("互作最高参与项", min_value=2, max_value=5, step=1, value=2,
                                                         key="create_xtox_level",
-                                                        help="此项只限制了每个互作项的 [最高参与项数], 而 [不一定] 得到最高参与项,  \n"
-                                                             "如设置此项数为 4, 得到 [x_3=x_1×x_2×(x_2-x_1)], 此时 [x_3] 的项数 [=4],  \n"
-                                                             "但是更换随机种子得到 [x_3=x_1×x_2], 此时 [2<=4], 是合理的.  \n"
-                                                             "[总结]: 当此项设为 [n] 时, 将不会超过参与项超过 [n] 的 [互作项]"
+                                                        help=create_help_dict.get("create_xtox_level","无描述"),
                                                         )
 
             # 7-2-3-4 随机种子 -------------------------------------------------------------------------------------------
 
-            creation_seed_expander = st.expander("随机种子", expanded=True)
+            creation_seed_expander = st.expander("**随机种子**", expanded=True)
 
             with creation_seed_expander:
 
@@ -2224,7 +2529,7 @@ if use_data_type == use_data_options[0]:
                         if st.session_state["formular_refresh"]:
 
                             create_funcseed = st.number_input("f(x)随机种子", min_value=0, max_value=20000, step=1, value=st.session_state["create_funcseed"]+1, key="create_funcseed",
-                                                           help="输入x数量后, 每个x被分到一个f构成f(x), f不一定一样, 随机种子用于决定这些 f"
+                                                           help=create_help_dict.get("create_funcseed", "无描述"),
                                                            )
 
                         else:
@@ -2232,7 +2537,7 @@ if use_data_type == use_data_options[0]:
                             create_funcseed = st.number_input("f(x)随机种子", min_value=0, max_value=20000, step=1,
                                                               value=st.session_state["create_funcseed"],
                                                               key="create_funcseed",
-                                                              help="输入x数量后, 每个x被分到一个f构成f(x), f不一定一样, 随机种子用于决定这些 f"
+                                                              help=create_help_dict.get("create_funcseed", "无描述"),
                                                               )
 
                         st.session_state["formular_refresh"] = False
@@ -2241,7 +2546,7 @@ if use_data_type == use_data_options[0]:
                     else:
 
                         create_funcseed = st.number_input("f(x)随机种子", min_value=0, max_value=20000, step=1, value=73, key="create_funcseed",
-                                                       help="输入x数量后, 每个x被分到一个f构成f(x), f不一定一样, 随机种子用于决定这些 f"
+                                                       help=create_help_dict.get("create_funcseed", "无描述"),
                                                        )
                         st.session_state["formular_refresh"] = False
 
@@ -2295,24 +2600,8 @@ if use_data_type == use_data_options[0]:
 
             create_x_bank = st.multiselect(label="可出现的f(x):", options=["All"] + list(function_dict.keys()),
                                            default=["线性函数", "正弦函数", "二次函数"], key="create_x_bank",
-                                           help=
-                                           "'正弦函数': f'sin(πx)',  \n"
-                                           "'余弦函数': f'cos(πx)'  \n"
-                                           "'二次函数': f'2(x)^2',  \n"
-                                           "'平方根函数': f'sqrt(x)',  \n"
-                                           "'指数函数': f'e^x',  \n"
-                                           "'对数函数（平移）': f'log(x+1)',  \n"
-                                           "'对数函数（加偏移防负值）': f'log(x)',  \n"
-                                           "'Sigmoid 函数': f'1/(1+e^-6x)',  \n"
-                                           "'三次多项式函数': f'2x^3+x^2-2x',  \n"
-                                           "'指数幂函数': f'2^5(x+1)',  \n"
-                                           "'高频正弦函数': f'sin(2πx)',  \n"
-                                           "'混合三角+线性函数': f'1/5×sin(4x)+(11/10)×x',  \n"
-                                           "'高频正弦 + 线性项': f'sin(5πx)+x',  \n"
-                                           "'高频余弦函数': f'cos(6πx)',  \n"
-                                           "'高频正弦线性混合函数': f'1/10×sin(10.6×f)+(11/10)×x',  \n"
-                                           "'非线性频率余弦函数': f'cos(5πx(x+1))',  \n"
-                                           "'非线性频率正弦函数': f'sin(4πx(x+1))'  \n"
+                                           help= create_help_dict.get("create_x_bank", "无描述")
+
                                            )
 
             if "All" in create_x_bank:
@@ -2448,107 +2737,7 @@ if use_data_type == use_data_options[0]:
 # 7-5 Createdata-enhance 区 ---------------------------------------------------------------------------------------------
 
 
-    # 实现括号上色的程序1
-    def colorize_brackets_by_depth(expr: str) -> str:
-        """
-        对表达式中的括号进行着色，按嵌套层级循环使用不同颜色，
-        并正确处理 LaTeX 中指数符号（^）所需的大括号匹配问题。
-
-        参数:
-            expr (str): 传入的原始字符串表达式（例如 "y = 2(2(x_2)^2)^2"）
-
-        返回:
-            str: 添加 LaTeX 颜色标签后的表达式，可直接用于 st.latex() 渲染
-        """
-        colors = ['orange', 'red', 'blue', 'yellow', "green", "violet", 'brown', "lime"]
-        num_colors = len(colors)
-        result = ''  # 最终拼接的 LaTeX 字符串
-        depth = 0  # 括号嵌套深度
-        stack = []  # 颜色栈，用于匹配每个左括号的颜色
-        char_energy = np.array([])  # 存储每个 ^ 所在时的括号层级，用于后续决定在哪里闭合大括号
-        char_len = len(expr)
-
-        # 遍历每个字符
-        for i, char in enumerate(expr):
-
-            if char == '^':
-                # 遇到 ^ 开启指数，追加 ^{ 并记录当前 depth
-                result += '^' + '{'
-                char_energy = np.append(char_energy, depth)
-
-            elif char == '(':
-                # 左括号，根据当前 depth 上色并入栈
-                color = colors[depth % num_colors]
-                result += rf'\textcolor{{{color}}}{{(}}'
-                stack.append(color)
-                depth += 1
-
-            elif char == ')':
-
-                # 右括号，先结束 ^ 开启的大括号（若满足闭合条件）
-
-                if stack:
-                    color = stack.pop()
-                else:
-                    color = colors[0]  # 兜底：括号不匹配时默认颜色
-
-                # 统计在当前 depth 下应该关闭多少个 ^ 所开启的大括号
-                energy_exhausted = char_energy >= depth - 1
-                char_energy = char_energy[char_energy < depth - 1]
-
-                # 加上当前层级右括号
-
-                result += "}" * np.sum(energy_exhausted)  # 添加闭合括号
-                depth -= 1
-                result += rf'\textcolor{{{color}}}{{)}}'
-
-            else:
-                # 普通字符直接加入结果
-                result += char
-
-            # 若到达末尾，补齐所有未关闭的大括号
-            if i == char_len - 1:
-                result += "}" * len(char_energy)
-
-        return result
-
-
-    # 实现括号上色的程序2
-    def apply_colored_brackets(expr: str) -> str:
-        """
-        对整个表达式按加号（+）分隔后逐段处理括号着色。
-
-        参数:
-            expr (str): 传入的表达式（例如 "y = 2(2(x_2)^2)^2 + sin(πx_1)"）
-
-        返回:
-            str: 添加括号颜色的完整表达式
-        """
-        terms = expr.split('+')
-        colored_terms = [colorize_brackets_by_depth(term.strip()) for term in terms]
-        return ' + '.join(colored_terms)
-
     with create_preview_panel:
-
-        st.subheader('模拟样本预览区')
-        st.markdown('')
-        st.markdown('---')
-        st.markdown("")
-
-        # 7-5-1 定义内容区 -----------------------------------------------------------------------------------------------
-
-        formular_title_col, formular_refresh_col,  formular_title_sep= st.columns([1, .7, 7])
-
-        with formular_title_col:
-            render_section_title("你的函数 be like :")
-
-        with formular_refresh_col:
-            f_refresh_button = st.button("**换一个**", use_container_width=True)
-            if f_refresh_button:
-
-                st.session_state["formular_refresh"]= True
-
-                st.rerun()
 
         with st.spinner("正在生成函数实例, 勿点击任何按钮..."):
 
@@ -2622,7 +2811,11 @@ if use_data_type == use_data_options[0]:
         st.markdown('')
         st.markdown("")
         st.markdown("")
-
+        st.markdown('')
+        st.markdown('')
+        st.markdown('')
+        st.markdown('')
+        st.markdown('')
         # 7-5-4 打印公式的latex格式 ---------------------------------------------------------------------------------------
 
         latex_expr = apply_colored_brackets(formula_eg)
@@ -2638,8 +2831,12 @@ if use_data_type == use_data_options[0]:
         st.markdown("")
         st.markdown('')
         st.markdown('')
+        st.markdown('')
+        st.markdown('')
+        st.markdown('')
+        st.markdown('')
         st.markdown("---")
-
+        st.markdown('')
         st.markdown("")
         st.markdown("")
         st.markdown("")
@@ -2746,11 +2943,16 @@ if use_data_type == use_data_options[0]:
                     iner_col = len(col_level) - indi_col
                     max_level = max(col_level)
 
-                    unrelated_num = create_param_num - indi_col
+                    unrelated_num = create_param_num - (indi_col+iner_col)
 
                     if unrelated_num > 0:
-                        with formular_title_sep:
-                            st.markdown(f"<div style='text-align: right; margin-top: -10px; padding-right: 20px;'> <span style='color: #3580f5; font-size:25px;'><strong> [{unrelated_num}] </strong></span>个未使用的自变量</div>", unsafe_allow_html=True)
+                        with formular_sep_3:
+                            st.markdown(f"""
+                            <div style='text-align: right; margin-top: -10px; padding-right: 20px;'>
+                                <span style='color: #3580f5; font-size:25px;'><strong>[{unrelated_num}]</strong></span>
+                                <span style='font-size:17px;'> 个未使用的自变量</span>
+                            </div>
+                            """, unsafe_allow_html=True)
 
                     st.markdown("")
 
