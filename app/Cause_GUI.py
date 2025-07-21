@@ -1063,7 +1063,7 @@ with host_config_panel:
                     st.session_state.update(last_config)
                     config_input = True
 
-                    st.success("✅ 已成功载入上次运行配置")
+                    st.success("✔ 已成功载入上次运行配置")
                     st.rerun()
 
                 else:
@@ -1122,7 +1122,7 @@ with host_config_panel:
             col1, col2 = st.columns([1, 1])
             confirm_deleted = False
             with col1:
-                if st.button("✅ 确认", use_container_width=True):
+                if st.button("✔ 确认", use_container_width=True):
                     json_files = glob.glob(os.path.join(config_dir, "*.json"))
 
                     # 遍历删除
@@ -2205,7 +2205,7 @@ if use_data_type == use_data_options[0]:
         #     render_section_title("你的函数 be like :", underline=False)
 
         with formular_refresh_col:
-            f_refresh_button = st.button("**⇄**", use_container_width=True)
+            f_refresh_button = st.button("Clear", use_container_width=True)
             if f_refresh_button:
 
                 st.session_state["formular_refresh"]= True
@@ -2276,7 +2276,7 @@ if use_data_type == use_data_options[0]:
         st.markdown("")
 
         create_data_expander = st.expander('**生成模拟数据**', expanded=True)
-        
+
         create_help_dict = {
 
             "create_param_num":'这个参数决定 [特征池] 的大小,  参与 [y] 构成的那些自变量 [X] 将会在池中选择, 池中剩余的 [特征] 为[无关特征]',
@@ -2293,11 +2293,11 @@ if use_data_type == use_data_options[0]:
                                                      " [y=x_1 + 2×x_2 + 3×(x_1×x_2))],实际上只有两个 [X]参与了函数关系  \n"
                                                      "[⚠️激进的参数]: 此项将会显著增加函数复杂度  \n"
                                                      "[⚡不受控的参数]: 开启此项后, 将不受随机种子控制",
-            
+
             "create_xtox_num": "此参数定义了构成 [y] 的函数关系内有多少互作项, 互作列是指由[多个X]影响的列,"
                                                                    " 只会由选择为[使用的X]构成,  \n如 [y = x_1 + x_1^2 + x_2 + (x_1×x_2)], "
                                                                 "此时 [互作项] = 1",
-            
+
             "create_xtox_level":"此项只限制了每个互作项的 [最高参与项数], 而 [不一定] 得到最高参与项,  \n"
                                                              "如设置此项数为 4, 得到 [x_3=x_1×x_2×(x_2-x_1)], 此时 [x_3] 的项数 [=4],  \n"
                                                              "但是更换随机种子得到 [x_3=x_1×x_2], 此时 [2<=4], 是合理的.  \n"
@@ -2322,9 +2322,9 @@ if use_data_type == use_data_options[0]:
                                            "'高频正弦线性混合函数': f'1/10×sin(10.6×f)+(11/10)×x',  \n"
                                            "'非线性频率余弦函数': f'cos(5πx(x+1))',  \n"
                                            "'非线性频率正弦函数': f'sin(4πx(x+1))'  \n",
-            
+
         }
-        
+
         with create_data_expander:
 
             # 7-2-3-1 无关功能 -------------------------------------------------------------------------------------------
@@ -2412,7 +2412,7 @@ if use_data_type == use_data_options[0]:
 
                     else:
                         create_x_limit = 0
-                    
+
                     if "create_x_num" in st.session_state:
 
                         if st.session_state.get("add_x", False):
@@ -2439,6 +2439,7 @@ if use_data_type == use_data_options[0]:
                                                               help=create_help_dict.get("create_x_num", "无描述"),
                                                               )
 
+
                     else:
 
                         create_x_num = st.number_input("独立项数量", min_value=0, max_value=20, step=1,
@@ -2448,10 +2449,26 @@ if use_data_type == use_data_options[0]:
                                                        )
 
 
+                    create_redun_count = st.slider("X的冗余最大层 ⚠️", min_value=1, max_value=8, step=1, value=5,
+                                                   key="create_redun_count",
+                                                   help="[⛓️‍存在依赖项]: 此项发挥作用需要 [开启冗余] 被设置为 [True],  \n"
+                                                        "[⚠️激进的参数]: 此参数将显著影响函数复杂度,  \n"
+                                                        "[互作层级]: 指原变量外嵌套的 f 层级, 如 x_3 = sin(x_2), 此时 [嵌套层级] = 1  \n"
+                                                        " x_3 = cos(sin(x_2))^2, 此时 [嵌套层级] = 3  \n"
+                                                        "[互作层级] 越高,则越可能生成复杂的 [冗余项]  \n"
+                                                   )
+
                 with create_redun_col:
 
                     create_redun = st.selectbox("**开启冗余** ⚠️", [False, True], key="create_redun",
                                                 help=create_help_dict.get("create_redun", "无描述"),)
+
+                    create_redun_slope = st.slider("X的冗余倾向 ⚠️", min_value=1.0, max_value=8.0, step=0.5, value=2.5,
+                                                   key="create_redun_slope",
+                                                   help="[⛓️‍存在依赖项]: 此项发挥作用需要 [开启冗余] 被设置为 [True],  \n"
+                                                        "[⚠️激进的参数]: 此参数将显著影响函数复杂度,  \n"
+                                                        "[冗余倾向] 越高,则越可能生成复杂的 [冗余项], 也越可能使用 [冗余特征] 参与构成 [y]  \n"
+                                                   )
 
             # 7-2-3-3互作功能 --------------------------------------------------------------------------------------------
 
@@ -2576,26 +2593,24 @@ if use_data_type == use_data_options[0]:
 
 
             # 7-2-3-5 一些其他功能 ----------------------------------------------------------------------------------------
+
+            create_noise = st.slider("y_obs 噪音强度", min_value=0.0, max_value=8.0, step=0.1, value=0.5,
+                                     key="create_noise",
+                                     help="生成模拟样本后往[期望值y_exp]添加的噪音强度"
+                                     )
+
             st.markdown("")
             create_linear_coef_col, create_linear_intercept_col = st.columns([1, 1])
 
             with create_linear_coef_col:
 
-                create_noise = st.slider("y_obs 噪音强度", min_value=0.0, max_value=8.0, step=0.1, value=0.5,
-                                                  key="create_noise",
-                                                  help="生成模拟样本后往[期望值y_exp]添加的噪音强度"
-                                                  )
+
 
                 create_linear_coef_range = st.slider("线性函数系数范围", -10, 10, (-3, 3), key="create_linear_coef_range", step=1)
 
 
             with create_linear_intercept_col:
-                create_redun_slope = st.slider("X的冗余倾向 ⚠️", min_value=1.0, max_value=8.0, step=0.5, value=2.5,
-                                                  key="create_redun_slope",
-                                                  help="[⛓️‍存在依赖项]: 此项发挥作用需要 [开启冗余] 被设置为 [True],  \n"
-                                                       "[⚠️激进的参数]: 此参数将显著影响函数复杂度,  \n"
-                                                       "[互作倾向] 越高,则越可能生成复杂的 [互作项], 也越可能使用 [冗余特征] 参与构成 [y]  \n"
-                                                  )
+
                 create_linear_intercept_range = st.slider("线性函数截距范围", -25, 25, (-5, 5), key='create_linear_intercept_range', step=2)
 
             create_x_bank = st.multiselect(label="可出现的f(x):", options=["All"] + list(function_dict.keys()),
@@ -2661,6 +2676,7 @@ if use_data_type == use_data_options[0]:
             "use_xtox_func": create_xtox_bank,
             'redun_seed': create_redun_seed,
             'x_mode': create_x_mode,
+            'redun_max_count': create_redun_count,
         }
 
         # 传给 detail_panel 的参数
@@ -2962,11 +2978,11 @@ if use_data_type == use_data_options[0]:
                     exe_X = {
 
                         f"X池: {', '.join([f'x_{i + 1}' for i in range(create_param_num)])}": " " + "".join(
-                            ["✅" if create_param_num == create_param_num else "❌"]),
+                            ["✔" if create_param_num == create_param_num else "❌"]),
                         f"{'使用X: ' + ', '.join(x_use_xidx)}": "  " + "".join(
-                            ["✅" if create_use_x_num == len(x_picked_eg) else "❌"]),
+                            ["✔" if create_use_x_num == len(x_picked_eg) else "❌"]),
                         f"样本数 {create_thresh_range}: {x_eg.shape[0]}": " " + "".join(
-                            ["✅" if (create_thresh_range[1] > x_eg.shape[0] > create_thresh_range[0]) else "❌"]),
+                            ["✔" if (create_thresh_range[1] > x_eg.shape[0] > create_thresh_range[0]) else "❌"]),
 
                     }
 
@@ -2976,7 +2992,7 @@ if use_data_type == use_data_options[0]:
                     exe_unrelated = {
 
                         f"检测到无关列={(x_eg_use.shape[1] - create_use_x_num)}": " " + "".join(
-                            ["✅" if unrelated_num == (x_eg_use.shape[1] - create_use_x_num) else "❌"]), }
+                            ["✔" if unrelated_num == (x_eg_use.shape[1] - create_use_x_num) else "❌"]), }
 
                     display_detial_dict(exe_unrelated)
 
@@ -2984,11 +3000,11 @@ if use_data_type == use_data_options[0]:
 
                     exe_react = {
 
-                        f"检测到独立项={indi_col}": " " + "".join(["✅" if (
+                        f"检测到独立项={indi_col}": " " + "".join(["✔" if (
                                 indi_col == create_x_num) else "❌"]),
-                        f"检测到互作项={X_eg.shape[1] - indi_col}": " " + "".join(["✅" if (
+                        f"检测到互作项={X_eg.shape[1] - indi_col}": " " + "".join(["✔" if (
                                 X_eg.shape[1] - indi_col == create_xtox_num) else "❌"]),
-                        f"检测到的最高level={max_level}": " " + "".join(["✅" if (
+                        f"检测到的最高level={max_level}": " " + "".join(["✔" if (
                                 max_level <= create_xtox_level) else "❌"]),
 
                     }
