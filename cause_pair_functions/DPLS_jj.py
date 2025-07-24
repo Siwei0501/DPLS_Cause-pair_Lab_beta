@@ -1,3 +1,4 @@
+import traceback
 from typing import Literal, Union, Iterable
 
 import numpy as np
@@ -32,6 +33,7 @@ class DPLS:
                  tol=0.001,
                  n_jobs=1,
                  square=True,
+                 power=0,
                  random_state=None,
                  **kwargs):
 
@@ -50,6 +52,7 @@ class DPLS:
         self.n_jobs = n_jobs
         self.random_state = random_state
         self.square = square
+        self.power = power
 
         # 预测过程属性
 
@@ -118,6 +121,13 @@ class DPLS:
 
         # distance 训练集测试集索引
         distance = DPLS_distance(X, distance_pattern=self.distance_pattern, dtype=self.dtype)
+
+        if self.power > 0:
+
+            for p in range(self.power):
+
+                distance = distance @ distance.T
+
         distance_trian_list, distance_test_list = DPLS_distance_divider(X, cv,
                                                                         distance_pattern=self.distance_pattern)
 
@@ -130,6 +140,10 @@ class DPLS:
 
                 X_train = distance[train_list[i], :][:, distance_trian_list[i]]
                 X_test = distance[test_list[i], :][:, distance_trian_list[i]]
+
+                print("test_list", len(test_list[i]))
+                print("train_list", len(train_list[i]))
+
                 # 想想为什么是 distance_trian_list[i], 而不是(这里↑) distance_test_list[i]
 
                 y_train = y[train_list[i], :]
@@ -146,7 +160,7 @@ class DPLS:
                     distance_train = X_train
                     distance_test = X_test
 
-                distance_train_mean = np.mean(distance_train, axis=0)
+                distance_test_mean = np.mean(distance_test, axis=0)
 
                 if self.eig_solver == 'pow':
 
@@ -172,12 +186,12 @@ class DPLS:
                 p_arys.append(p_ary)
 
                 # 计算第i折的 y_pred
-                y_preds[test_list[i], :] = (distance_test - distance_train_mean) @ p_ary + np.mean(y_train)
+                y_preds[test_list[i], :] = (distance_test - distance_test_mean) @ p_ary + np.mean(y_train)
 
         except ValueError:
 
             print('非法的矩阵,PLSR奇异值分解过程不符合要求')
-
+            traceback.print_exc()
             return storager
 
         else:
@@ -227,6 +241,22 @@ class DPLS:
 
             if fit_stored['y_pred_R2'] is None:
                 return fit_stored
+
+            print("fit_pred_R2-1", (fit_pred_R2[1:] - fit_pred_R2[:-1]))
+            print("fit_pred_R2-2", np.abs(np.diff(fit_pred_R2[::-1])))
+            print("fit_pred_R2-3", np.abs(np.diff(fit_pred_R2[::-1]))>0.01)
+
+            fit_pred_diff = np.abs(np.diff(fit_pred_R2[::-1]))
+
+            if not np.any(fit_pred_diff > 0.01):
+
+                fit_pred_neck = 0
+
+            else:
+
+                fit_pred_neck = np.argmax(fit_pred_diff)
+                print("fit_pred_neck_1 = ", fit_pred_neck)
+                fit_pred_neck = len(fit_pred_R2) - fit_pred_neck - 1
 
             P = np.arange(1, self.max_iter + 1)
 
@@ -286,7 +316,10 @@ class DPLS:
 
             elif self.fit_mode == 'Fit':
 
-                fit_P = np.argmax(Each_R2P)
+                fit_P = fit_pred_neck
+
+                print("fit_P = ", fit_P)
+                print("fit_pred_neck = ", fit_pred_neck)
 
             else:
                 raise AttributeError(f"Do not understand param of fit_mode: {self.fit_mode} ")
