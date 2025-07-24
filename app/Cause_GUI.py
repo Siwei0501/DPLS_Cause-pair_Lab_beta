@@ -1375,6 +1375,16 @@ DPLSR_param_dict = {
         "max": 500,
         "value": 20
     },
+
+    "power": {
+        "type": "slider",
+        "label": "距离矩阵自乘幂",
+        "min": 0,
+        "max": 10,
+        "value": 0,
+    },
+
+
     "R_mode": {
         "type": "select_slider",
         "label": "求R模式",
@@ -3202,7 +3212,7 @@ if use_data_type == use_data_options[0]:
                     # 更新布局
                     fig.update_layout(
                         title=dict(
-                            text=f"[x_{x_eg_columns.index(x_i) + 1}] [P: {P+1}] [R: {R:.2f}]-[PrsR:{calculate_corr(y_exp_eg, y_obs_eg)[0]:.2f}]",
+                            text=f"[x_{x_eg_columns.index(x_i) + 1}] [P: {P}] [R: {R:.2f}]-[PrsR:{calculate_corr(y_exp_eg, y_obs_eg)[0]:.2f}]",
                             x=0.55,  # 居中，可调
                             xanchor='right',
                             font=dict(size=19),
