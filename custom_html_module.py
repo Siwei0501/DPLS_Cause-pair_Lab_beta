@@ -138,9 +138,7 @@ def gen_seed(param_num: int, rand_seed: int, gen_times: int = 1):
     np.random.seed(None)
     return seed_list.tolist()
 
-
-# 参数收集器
-def param_controller(param_list: list, para_descriptions: dict, param_controls: dict, desc='', a_copied_dict=False) -> dict:
+def param_controller(param_list: list, para_descriptions: dict, param_controls: dict, desc='', a_copied_dict: bool | str | int =False, expanded=True) -> dict:
     param_kwargs = {}
 
     m = 0
@@ -150,17 +148,23 @@ def param_controller(param_list: list, para_descriptions: dict, param_controls: 
 
             with st.expander(
                     f"{desc}\t{chr(9312 + m)}&nbsp;&nbsp;{param}:&nbsp;&nbsp;&nbsp;{para_descriptions.get(param, '')} ",
-                    expanded=True):
+                    expanded=expanded):
                 param_kwargs[param] = {}
                 st.markdown('---')
 
                 for param_key, control in param_controls[param].items():
 
-                    if a_copied_dict:
-                        key_name = f"{param}_{param_key}_"
+                    if not a_copied_dict:
+                        key_name = f"{param}_{param_key}"
 
                     else:
-                        key_name = f"{param}_{param_key}"
+
+                        if a_copied_dict == 1:
+
+                            key_name = f"{param}_{param_key}_"
+
+                        else:
+                            key_name = f"{param}_{param_key}_{a_copied_dict}"
 
                     if control["type"] == "checkbox":
 

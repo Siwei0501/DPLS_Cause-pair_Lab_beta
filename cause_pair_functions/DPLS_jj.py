@@ -56,8 +56,8 @@ class DPLS:
 
         # 预测过程属性
 
-        self.X = None
-        self.y = None
+        self.X:np.ndarray|None = None
+        self.y:np.ndarray|None = None
 
         self.fit_mode=None
         self.fit_intercept=None
@@ -76,17 +76,11 @@ class DPLS:
         self.y_pred_R2 = None
 
         self.coef: np.ndarray | None = None
-        self.coef_transform = None
 
         if isinstance(distance_pattern, str):
             self.distance_pattern = [distance_pattern]
         else:
             self.distance_pattern = distance_pattern
-
-    def __getattr__(self, name):
-
-        self.__dict__[name] = None
-        return None
 
     def _DPLS_PLS_core(self, X, y, cv):
 

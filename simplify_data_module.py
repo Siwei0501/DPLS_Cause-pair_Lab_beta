@@ -4,11 +4,14 @@ import numpy as np
 from typing import Literal, Union
 
 from custom_html_module import *
+import io
+import zipfile
 import time
 from cause_pair_functions.muti_func_test import gen_y_exp
 from cause_pair_functions.DPLS_jj import DPLS
 import copy
 import plotly.graph_objects as go
+import plotly.io as pio
 
 
 # 定义区 ----------------------------------------------------------------------------------------------------------------
@@ -159,13 +162,52 @@ st.markdown('')
 st.markdown('')
 st.markdown('')
 hr_second(dark_color="#244690", height=2, light_color="#26519d")
-st.markdown('')
-st.markdown('')
-st.markdown('')
 
 # 7-2-3 定义生成模拟数据的控制面板 ---------------------------------------------------------------------------------------
 
-create_control_panel, create_sep1, create_preview_panel = st.columns([.382, 0.02, .618])
+create_control_panel, create_sep1, create_preview_panel = st.columns([.382, 0.022, .618])
+
+with create_sep1:
+    st.markdown("""
+        <style>
+            .vertical-line {
+                width: 1px;
+                height: 1640px;
+                margin: auto;
+                margin-top: -5px;
+            }
+
+            @media (prefers-color-scheme: dark) {
+                .vertical-line {
+                    background-color: #333333;
+                }
+            }
+
+            @media (prefers-color-scheme: light) {
+                .vertical-line {
+                    background-color: #d8d8d8;
+                }
+            }
+        </style>
+
+        <div class="vertical-line"></div>
+    """, unsafe_allow_html=True)
+
+with create_control_panel:
+    st.markdown('')
+    st.markdown('')
+    create_control_sep0, create_control_panel_ = st.columns([.01, 1])
+
+    with create_control_panel_:
+
+        st.markdown(
+            "<h3 style='text-align: center;'>函数控制面板</h3>",
+            unsafe_allow_html=True
+        )
+
+        st.markdown('---')
+        st.markdown("")
+        create_control_panel_expander = st.expander("DPLS_Lab", expanded=True,)
 
 st.markdown('')
 st.markdown('')
@@ -251,9 +293,9 @@ def apply_colored_brackets(expr: str) -> str:
     return ' + '.join(colored_terms)
 
 with create_preview_panel:
-
-    st.subheader('模拟样本预览区')
     st.markdown('')
+    st.markdown('')
+    st.subheader('函数')
     st.markdown('---')
     st.markdown("")
 
@@ -328,12 +370,7 @@ with create_preview_panel:
 
 
 
-with create_control_panel:
-
-    st.subheader('函数控制面板')
-    st.markdown('')
-    st.markdown('---')
-    st.markdown("")
+with create_control_panel_expander:
 
     create_data_expander = st.expander('**生成模拟数据**', expanded=True)
 
@@ -385,7 +422,7 @@ with create_control_panel:
 
     }
 
-    create_main_sets_col_1, create_main_sep, create_main_sets_col_2 = st.columns([.5,.02,.5])
+    create_main_sets_col_1, create_main_sets_col_2 = st.columns([.5,.5])
 
     # 7-2-3-1 无关功能 -------------------------------------------------------------------------------------------
 
@@ -620,7 +657,7 @@ with create_control_panel:
                                                help="输入x数量后, 每个x会在你给出的定义域上随机抽取n个(每个x抽到的不一样, 即使你只给了一个随机种子), x的随机种子用于决定这个抽取过程"
                                                )
 
-    create_advanced_sets_expander = st.expander("高级设置")
+    create_advanced_sets_expander = st.expander("**高级设置**")
 
     with create_advanced_sets_expander:
 
@@ -702,13 +739,14 @@ with create_control_panel:
 
         with create_linear_limit_col:
 
-            create_linear_limit = st.checkbox("仅生成线性样本", key="create_linear_limit")
+            create_linear_limit = st.checkbox("强制线性", key="create_linear_limit")
 
         with only_usedx_col:
 
             use_x_piked = st.checkbox("排除无关特征", key="use_x_piked", value=True)
 
     check_file_button = st.button("**检视**", use_container_width=True, icon="🔍")
+
     hr_second(dark_color="#244690", height=2.5, light_color="#26519d")
 
     # 7-3 收集参数 ---------------------------------------------------------------------------------------------------
@@ -814,6 +852,7 @@ with create_preview_panel:
     st.markdown('')
     st.markdown('')
     st.markdown('')
+    st.markdown("")
 
 
     # 7-5-4 打印公式的latex格式 ---------------------------------------------------------------------------------------
@@ -830,8 +869,8 @@ with create_preview_panel:
     st.markdown("")
     st.markdown("")
     st.markdown('')
-
-    st.markdown("---")
+    st.markdown("<div style='height:28px'></div>", unsafe_allow_html=True)
+    hr_second(dark_color="#244690", height=2.5, light_color="#26519d")
 
 # 独立与互作特征鉴别器(待升级)
 def count_unique_ai(expr: str, list_a: list) -> int:
@@ -844,11 +883,11 @@ def count_unique_ai(expr: str, list_a: list) -> int:
 
 # 读取颜色（默认浅色）
 
-with create_control_panel:
+with create_control_panel_expander:
 
-    formula_panel1_col1, f_sep1, formula_panel1_col2 = st.columns([.5, 0.02, .5])
+    formula_panel1_col1, formula_panel1_col2 = st.columns([.5, .5])
 
-    with formula_panel1_col1:
+    with formula_panel1_col2:
 
         create_method_expander = st.expander("选择分析的方法", expanded=True)
 
@@ -873,14 +912,14 @@ with create_control_panel:
             para_descriptions={'DPLSR': method_descriptions.get('DPLSR')},
             param_controls={"DPLSR": DPLSR_param_dict_},
             desc='方法',
-            a_copied_dict=True
+            a_copied_dict=True, expanded=True,
         )
 
         if not DPLS_kwargs['DPLSR']["distance_pattern"]:
             DPLS_kwargs['DPLSR']["distance_pattern"] = ['Euc']
 
 
-    with formula_panel1_col2:
+    with formula_panel1_col1:
 
         create_exe_expander_2 = st.expander(f"**输出**", expanded=True)
 
@@ -890,8 +929,6 @@ with create_control_panel:
             st.markdown('')
             st.markdown('')
             st.markdown("---")
-
-            illegal_compatible_mode = st.selectbox("非法样本兼容", [True, False], key="illegal_compatible_mode")
 
             direction_panel = st.columns([1, 1])
 
@@ -914,6 +951,8 @@ with create_control_panel:
                     step=10
                     , key="test_files_num")
 
+                illegal_compatible_mode = st.selectbox("非法样本兼容", [True, False], key="illegal_compatible_mode")
+
             with col_test_seed:
                 seed_value = st.number_input(
                     "类似函数抽样种子",
@@ -923,10 +962,39 @@ with create_control_panel:
                     step=1
                     , key="seed_value")
 
+                gen_floor = st.number_input(
+                    "噪音梯度",
+                    min_value=1,
+                    max_value=test_files_num,
+                    value=1,
+                    step=1
+                    , key="gen_floor")
+
+            st.markdown("")
+            create_noise = st.slider("y_obs 噪音强度域", min_value=0.0, max_value=5.0, step=0.05, value=(0.05, 0.5),
+                                     key="create_noise",
+                                     help="生成模拟样本后, 往[期望值y_exp]添加的噪音强度"
+                                     )
+
             thresh_range = st.slider("样本数限制在", 0, 10000, (100, 1500), key="thresh_range", step=100)
             st.markdown("")
 
-            run_button = st.button("run_button")
+        DPLS_attr_dict = DPLS().__dict__.copy()
+        DPLS_needed_param = ["cv", "max_iter", "R2", "cv_R2", "fit_R2", "p", "cv_p", "fit_p", "y_pred_R2", "square"]
+        DPLS_attr_dict = {k: v for k, v in DPLS_attr_dict.items() if k in DPLS_needed_param}
+
+        with st.expander("**选择需要的 DPLS 属性**", expanded=True):
+
+            st.markdown("")
+            DPLS_attr_col = st.columns([1.32, 1])
+
+            DPLS_picked_attr = {}
+
+            for idx, key in enumerate(DPLS_attr_dict.keys()):
+
+                with DPLS_attr_col[idx % 2]:
+                    DPLS_picked_attr[key] = st.checkbox(f"{key}", value=False, key=f"DPLS_needed_attr_{key}")
+
 
 created_data = {}
 total_0 = 0
@@ -1003,11 +1071,37 @@ total_file=0
 
     # 7-5-6 打印模拟样本的生成参数 与 参数符合度的检测结果 ------------------------------------------------------------------
 
+@st.cache_data(show_spinner=False)
+def export_multiple_plots_to_zip(fig_dict: dict[str, go.Figure]) -> bytes:
+    """
+    将多个 Plotly 图像导出为 PNG，并打包为 ZIP。
+
+    参数:
+        fig_dict: 一个字典，键为文件名，值为 plotly 图对象
+
+    返回:
+        bytes: zip 文件的字节内容
+    """
+    zip_buffer = io.BytesIO()
+
+    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
+        for filename, fig in fig_dict.items():
+            img_bytes = pio.to_image(fig, format="png", width=800, height=600, scale=2)
+            zip_file.writestr(f"{filename}.png", img_bytes)
+
+    zip_buffer.seek(0)
+    return zip_buffer.read()
+
 with create_preview_panel:
+    st.markdown('')
+    st.markdown('')
+    st.subheader('图像')
+    st.markdown('---')
     st.markdown("")
 
-    plot_sep_0, plot_P_col, plot_sep_1,plot_addnoise_col, plot_sep_4, plot_y_exp_col, plot_sep_2, plot_y_obs_col, plot_sep_3 = st.columns(
-        [.2, 1.3,.2,1.3,.2,.5,.2, .5, 3.5])
+
+    plot_sep_0, plot_P_col, plot_sep_1,plot_addnoise_col, plot_sep_4, plot_y_exp_col, plot_sep_2, plot_y_obs_col, plot_sep_3, plot_download_col = st.columns(
+        [.01, 1.3,.2,1.3,.2,.5,.2, .5, 2.9, .3])
 
 
     with plot_P_col:
@@ -1017,12 +1111,12 @@ with create_preview_panel:
 
     with plot_addnoise_col:
 
-        create_noise = st.slider("y_obs 噪音强度", min_value=0.0, max_value=5.0, step=0.1, value=0.5,
-                                 key="create_noise",
-                                 help="生成模拟样本后往[期望值y_exp]添加的噪音强度"
+        create_plot_noise = st.slider("y_obs 噪音强度", min_value=0.0, max_value=5.0, step=0.1, value=0.5,
+                                 key="create_plot_noise",
+                                 help="生成模拟样本后, 往[期望值y_exp]添加的噪音强度"
                                  )
         y_obs_eg = y_exp_eg + np.random.normal(size=y_exp_eg.shape[0], loc=0,
-                                               scale=y_exp_eg.std() * create_noise)
+                                               scale=y_exp_eg.std() * create_plot_noise)
         y_df_eg = pd.DataFrame()
         y_df_eg["y_exp"] = y_exp_eg
         y_df_eg["y_obs"] = y_obs_eg
@@ -1041,13 +1135,16 @@ with create_preview_panel:
     st.markdown("")
     st.markdown("")
     st.markdown("")
+    st.markdown('')
 
     with st.spinner("正在拟合..."):
 
         pred_obj = DPLS(**DPLS_kwargs["DPLSR"]).fit(x_eg_use.copy(), y_df_eg['y_obs'].copy(),
                                                     **DPLS_kwargs["DPLSR"])
-
-    cols = st.columns(2)  # 定义两列
+    # 定义两列
+    cols = st.columns(2)
+    fig_dict = {}
+    # 创建一个空图
 
     for idx, x_i in enumerate(x_picked_eg):
 
@@ -1085,7 +1182,6 @@ with create_preview_panel:
             P = enforce_P
 
         x_eg_use_i = pd.DataFrame()
-
         x_eg_use_i[x_i] = pred_obj.X.copy()[:, x]
 
         if print_exp:
@@ -1098,9 +1194,7 @@ with create_preview_panel:
 
         x_eg_use_i['preds'] = y_pred  # 使用完整预测值
 
-        # 创建一个空图
         fig = go.Figure()
-
         # 添加 y_exp（蓝色），优先添加以保证 preds 最上层
         if print_exp:
             fig.add_scatter(
@@ -1145,7 +1239,7 @@ with create_preview_panel:
         # 更新坐标轴标签
         fig.update_layout(
             xaxis_title=x_i,
-            yaxis_title='target',
+            yaxis_title=f'y',
             legend=dict(
                 traceorder="normal"  # 图例顺序按添加顺序排列
             )
@@ -1170,41 +1264,49 @@ with create_preview_panel:
 
         with cols[idx % 2]:
             st.plotly_chart(fig, use_container_width=True)
-        st.markdown("")
-        #
-        # img_bytes = pio.to_image(fig, format="png", width=800, height=600, scale=2)
-        #
-        # # 下载按钮
-        # st.download_button(
-        #     label="📥 下载图像 (PNG)",
-        #     data=img_bytes,
-        #     file_name="plot.png",
-        #     mime="image/png",
-        #     use_container_width=True,
-        # )
-        #
 
-create_check_file_expander = st.expander("检视预览函数样本", expanded=False)
-with create_check_file_expander:
-    formula_x_col, formula_check_file_sep, formula_y_col = st.columns([.738, 0.025, .382])
+        fig_dict[f"plots_{x_i}"] = fig
 
-    with formula_x_col:
-        st.markdown("")
-        st.markdown("")
-        render_section_title("来自函数的自变量:")
+create_check_file_sep, create_check_file_col = st.columns([0.001, 1])
 
-        with st.expander(f"**{x_eg.shape}**", expanded=True):
-            st.markdown("---")
-            st.dataframe(x_eg_use.copy(), height=795, hide_index=True)
+with create_check_file_col:
 
-    with formula_y_col:
-        st.markdown("")
-        st.markdown("")
+    create_check_file_expander = st.expander("检视预览函数样本", expanded=False)
+    with create_check_file_expander:
+        formula_x_col, formula_check_file_sep, formula_y_col = st.columns([.738, 0.025, .382])
 
-        render_section_title("因变量")
-        with st.expander(f"**{y_df_eg.shape}** | PersonR^2 = {calculate_corr(y_exp_eg, y_obs_eg)[0]:.3f}",
-                         expanded=True):
-            st.markdown("---")
-            st.dataframe(y_df_eg, height=795, hide_index=True)
+        with formula_x_col:
+            st.markdown("")
+            st.markdown("")
+            render_section_title("来自函数的自变量:")
+
+            with st.expander(f"**{x_eg.shape}**", expanded=True):
+                st.markdown("---")
+                st.dataframe(x_eg_use.copy(), height=795, hide_index=True)
+
+        with formula_y_col:
+            st.markdown("")
+            st.markdown("")
+
+            render_section_title("因变量")
+            with st.expander(f"**{y_df_eg.shape}** | PersonR^2 = {calculate_corr(y_exp_eg, y_obs_eg)[0]:.3f}",
+                             expanded=True):
+                st.markdown("---")
+                st.dataframe(y_df_eg, height=795, hide_index=True)
 
 hr_second(dark_color="#244690", height=2.5, light_color="#26519d")
+
+with plot_download_col:
+    with st.spinner(""):
+
+        zip_bytes = export_multiple_plots_to_zip(fig_dict)
+
+        st.markdown("")
+        # 下载按钮
+        st.download_button(
+            label="📥",
+            data=zip_bytes,
+            file_name=f"all_plots_{formula_eg}.zip",
+            mime="application/zip",
+            use_container_width=True
+        )
