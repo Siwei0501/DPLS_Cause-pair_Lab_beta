@@ -92,12 +92,33 @@ def col_mean(data: pd.DataFrame, host_col, guest_col):
     return host
 
 
-def cal_DPLSR(file_value:pd.DataFrame, **kwargs):
+def cal_DPLSR(file_value:pd.DataFrame, need_P:bool=False, need_Rs:bool=False, **kwargs):
 
     value_copy = file_value.copy()
 
+    if "max_iter" in kwargs:
+
+        max_iter = kwargs["max_iter"]
+
+    else:
+
+        max_iter = 20
+
     DPLS_obj = DPLS(**kwargs).fit(value_copy[[kwargs['reason']]], value_copy[[kwargs['result']]], **kwargs)
-    return DPLS_obj.R2[0], DPLS_obj.p[0]
+
+    DPLS_return = [DPLS_obj.R2[0]]
+
+    if need_P:
+
+        DPLS_return.append(DPLS_obj.p[0])
+
+    if need_Rs:
+
+        for p in range(max_iter):
+            DPLS_return.append(DPLS_obj.y_pred_R2[0][p])
+
+    return DPLS_return
+
 
 def cal_PersonR(file_value:pd.DataFrame,R2=True,  **kwargs):
     value_copy = file_value.copy()
@@ -922,7 +943,6 @@ algorithms = {'DPLSR': cal_DPLSR,
               'GS': cal_GS,
               'PATH_tender': cal_path_tender,
 
-
               'aCMV_DPLSe_KCI': cal_aCMV_DPLSe_KCI,
               'CMVe_DPLSe_KCI': cal_CMVe_DPLSe_KCI,
               'DPLSe_KCI': cal_Xe_KCI,
@@ -936,13 +956,44 @@ algorithms = {'DPLSR': cal_DPLSR,
 
 
 def return_name(method, reverse=False, **kwargs) -> list[str]:
+
     if method == 'DPLSR':
 
-        if reverse:
-            col_name = [f"DPLS_R2{kwargs['pre_process']}(B, A)", f"P{kwargs['pre_process']}(B, A)"]
-        else:
-            col_name = [f"DPLS_R2{kwargs['pre_process']}(A, B)", f"P{kwargs['pre_process']}(A, B)"]
+        if "max_iter" in kwargs:
 
+            max_iter = kwargs["max_iter"]
+
+        else:
+
+            max_iter = 20
+
+        pre_char = f"{kwargs['pre_process']}"
+
+        if reverse:
+
+            tail_char = f"(B, A)"
+
+        else:
+
+            tail_char = f"(A, B)"
+
+        col_name = [f"DPLS_R2{pre_char}{tail_char}"]
+
+        if 'need_P' in kwargs:
+
+            if kwargs['need_P']:
+
+                col_name.append(f"DPLS_P{pre_char}{tail_char}")
+
+        if 'need_Rs' in kwargs:
+
+            if kwargs['need_Rs']:
+
+                for p in range(max_iter):
+
+                    col_name.append(f"P_{p}{tail_char}")
+
+        return col_name
 
     elif method == 'P_DPLSR':
 
