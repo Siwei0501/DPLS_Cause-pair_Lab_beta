@@ -56,8 +56,8 @@ class DPLS:
 
         # 预测过程属性
 
-        self.X = None
-        self.y = None
+        self.X:np.ndarray|None = None
+        self.y:np.ndarray|None = None
 
         self.fit_mode=None
         self.fit_intercept=None
@@ -76,17 +76,11 @@ class DPLS:
         self.y_pred_R2 = None
 
         self.coef: np.ndarray | None = None
-        self.coef_transform = None
 
         if isinstance(distance_pattern, str):
             self.distance_pattern = [distance_pattern]
         else:
             self.distance_pattern = distance_pattern
-
-    def __getattr__(self, name):
-
-        self.__dict__[name] = None
-        return None
 
     def _DPLS_PLS_core(self, X, y, cv):
 
@@ -141,8 +135,8 @@ class DPLS:
                 X_train = distance[train_list[i], :][:, distance_trian_list[i]]
                 X_test = distance[test_list[i], :][:, distance_trian_list[i]]
 
-                print("test_list", len(test_list[i]))
-                print("train_list", len(train_list[i]))
+                # print("test_list", len(test_list[i]))
+                # print("train_list", len(train_list[i]))
 
                 # 想想为什么是 distance_trian_list[i], 而不是(这里↑) distance_test_list[i]
 
@@ -242,12 +236,12 @@ class DPLS:
             if fit_stored['y_pred_R2'] is None:
                 return fit_stored
 
-            print("fit_pred_R2-1", (fit_pred_R2[1:] - fit_pred_R2[:-1]))
+            # print("fit_pred_R2-1", (fit_pred_R2[1:] - fit_pred_R2[:-1]))
 
             fit_pred_diff = np.abs(np.diff(fit_pred_R2[::-1]))
             fit_pred_mean= np.array([np.mean(fit_pred_diff[:v]) for v in range(1, len(fit_pred_R2))])
 
-            print("fit_pred_mean", fit_pred_mean)
+            # print("fit_pred_mean", fit_pred_mean)
 
             fit_pred_mean_ratio = (fit_pred_diff[1:] / fit_pred_mean[:-1])
             fit_pred_mean_ratio = fit_pred_mean_ratio[::-1]

@@ -1,8 +1,13 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-from typing import Literal, Union
 
+import time
+import plotly.graph_objects as go
+from joblib import Parallel, delayed
+from stqdm import stqdm
+from typing import Literal, Union, Callable
+from cause_pair_functions.DPLS_jj import DPLS
 
 # 多重检验分折器
 def spliter(sample_num, cv: int = 5, mode: Literal['uniform', 'layers'] = 'layers', random_before: bool = False,
@@ -139,8 +144,36 @@ def gen_seed(param_num: int, rand_seed: int, gen_times: int = 1):
     return seed_list.tolist()
 
 
-# 参数收集器
-def param_controller(param_list: list, para_descriptions: dict, param_controls: dict, desc='', a_copied_dict=False) -> dict:
+def parallel_wrapper(
+        func: Callable,
+        file_value_dict: dict,
+        desc: str,
+        thread: int = 1,
+        **kwargs
+
+) -> dict:
+
+    global title_bar_progress
+
+    return_dict = {}
+
+    if thread == 1:
+
+        for file_name, file_value in stqdm(file_value_dict.items(), desc=desc):
+            file_return = func(file_value, **kwargs)
+            return_dict[file_name] = file_return
+
+    else:
+
+        file_name_list = list(file_value_dict.keys())
+        thread_result = Parallel(n_jobs=thread)(delayed(func)(file_value_dict[key], **kwargs) for key in file_name_list)
+
+        for key, value in zip(file_name_list, thread_result):
+            return_dict.update({key: value})
+
+    return return_dict
+
+def param_controller(param_list: list, para_descriptions: dict, param_controls: dict, desc='', a_copied_dict: bool | str | int =False, expanded=True) -> dict:
     param_kwargs = {}
 
     m = 0
@@ -150,17 +183,23 @@ def param_controller(param_list: list, para_descriptions: dict, param_controls: 
 
             with st.expander(
                     f"{desc}\t{chr(9312 + m)}&nbsp;&nbsp;{param}:&nbsp;&nbsp;&nbsp;{para_descriptions.get(param, '')} ",
-                    expanded=True):
+                    expanded=expanded):
                 param_kwargs[param] = {}
                 st.markdown('---')
 
                 for param_key, control in param_controls[param].items():
 
-                    if a_copied_dict:
-                        key_name = f"{param}_{param_key}_"
+                    if not a_copied_dict:
+                        key_name = f"{param}_{param_key}"
 
                     else:
-                        key_name = f"{param}_{param_key}"
+
+                        if a_copied_dict == 1:
+
+                            key_name = f"{param}_{param_key}_"
+
+                        else:
+                            key_name = f"{param}_{param_key}_{a_copied_dict}"
 
                     if control["type"] == "checkbox":
 
@@ -322,6 +361,25 @@ def return_cause_pair(not_pair_data: pd.DataFrame, relation: Literal["AB", "BA",
             pair_cause.extend([0] * len(data_in_pair))
 
     return pair_data, pair_name, pair_cause
+
+
+def cal_DPLS_pred(file_value:pd.DataFrame,  **kwargs):
+
+    value_copy = file_value.copy()
+
+    DPLS_obj = DPLS(**kwargs).fit(value_copy[[kwargs['reason']]], value_copy[[kwargs['result']]], **kwargs)
+
+    return DPLS_obj.R2[0], DPLS_obj.y_pred[0]
+
+
+def cal_DPLS_obj(file_value:pd.DataFrame, **kwargs):
+
+    value_copy = file_value.copy()
+
+    DPLS_obj = DPLS(**kwargs).fit(value_copy[[kwargs['reason']]], value_copy[[kwargs['result']]], **kwargs)
+
+    return DPLS_obj
+
 
 def render_dataset_title(title: str, font_size:float|int=26, align="left"):
     # 注入一次全局样式
@@ -532,3 +590,165 @@ def hr_second(height=2, dark_color="#ffffff", light_color="#000000", left_px=0, 
         """,
         unsafe_allow_html=True
     )
+
+
+def expand_raw_now_files(raw: dict, total_0, total_1, total_file, thread=1, expand=True, print_pred=False):
+
+    check_file_panel = st.columns([1, 0.03, 1, 0.03, .72])
+
+    with check_file_panel[0]:
+
+        with st.expander('原始值', expanded=expand):
+            # 文件列表标题
+            raw_x_cols = st.columns([3, 4])
+            raw_x_cols[0].markdown(
+                "<div style='text-align: left; margin-top: 30px; padding-left:10px;'>文件名</div>",
+                unsafe_allow_html=True)
+            raw_x_cols[1].markdown(
+                f"<div style='text-align: right; margin-top: 23px; padding-right: 20px;'> <span style='color: #55dd99; font-size:20px;'><strong>{total_file}</strong></span> files</div>",
+                unsafe_allow_html=True)
+            st.markdown("---")
+
+            for db_name, db_values in raw.items():
+
+                db_len = len(db_values["files_pair"])
+
+                with st.expander(f'{db_name} | {db_len} files'):
+
+                    for name, values in db_values["files_pair"].items():
+                        with st.expander(f'{name} | {values.shape}'):
+                            st.dataframe(values)
+
+        st.markdown("---")
+
+    with check_file_panel[2]:
+
+        with st.expander('Cause directions', expanded=expand):
+            # 文件列表标题
+            raw_y_cols = st.columns([4, 4])
+
+            raw_y_cols[0].markdown(
+                f"<div style='text-align: left; margin-top: 20px; padding-left: 20px;'> <span style='color: #4477dd; font-size:20px;'><strong>[{total_1}] </strong></span> A -> B</div>",
+                unsafe_allow_html=True)
+
+            raw_y_cols[1].markdown(
+                f"<div style='text-align: right; margin-top: 20px; padding-right: 20px;'> <span style='color: #dd4477; font-size:20px;'><strong>[{total_0}] </strong></span> B -> A</div>",
+                unsafe_allow_html=True)
+            st.markdown("---")
+
+            for db_name, db_values in raw.items():
+                db_len = len(db_values["files_cause"])
+
+                with st.expander(f'{db_name} | {db_len} files'):
+                    files_cause_df = pd.DataFrame.from_dict(db_values["files_cause"], orient='index')
+
+                    st.dataframe(files_cause_df)
+
+        st.markdown("---")
+        time.sleep(1)
+
+    with check_file_panel[4]:
+
+        with st.expander('Plots', expanded=expand):
+
+            raw_p_cols = st.columns([4, 4])
+
+            raw_p_cols[0].markdown(
+                "<div style='text-align: left; margin-top: 30px; padding-left:10px;'>图像数量</div>",
+                unsafe_allow_html=True)
+
+            raw_p_cols[1].markdown(
+                f"<div style='text-align: right; margin-top: 23px; padding-right: 20px;'> <span style='color: #55dd99; font-size:20px;'><strong>{total_file}</strong></span> plots</div>",
+                unsafe_allow_html=True)
+
+            st.markdown("---")
+
+            for db_name, db_values in raw.items():
+
+                db_len = len(db_values["files_pair"])
+
+                with st.expander(f'{db_name} | {db_len} files'):
+
+                    if print_pred:
+
+                        if "files_dpls_obj" in db_values:
+                            checking_dpls_objs:dict = db_values["files_dpls_obj"]
+
+                        else:
+                            checking_dpls_objs:dict = parallel_wrapper(cal_DPLS_obj, db_values["files_pair"], desc="cal_DPLS_obj", reason=0, result=1, thread=thread)
+
+                    for name, values in db_values["files_pair"].items():
+
+                        with st.expander(f'{name} | {values.shape}'):
+
+                            fig_db = go.Figure()
+
+                            # 添加 y_exp（蓝色），优先添加以保证 preds 最上层
+
+                            fig_db.add_scatter(
+                                x=values[0],
+                                y=values[1],
+                                mode='markers',
+                                name='y_obs',
+                                marker=dict(
+                                    color='#3580F5',
+                                    size=6,
+                                    opacity=0.75
+                                )
+                            )
+
+                            if print_pred:
+
+                                checking_pred = checking_dpls_objs[name].y_pred[0]
+
+                                fig_db.add_scatter(
+                                    x=values[0],
+                                    y=checking_pred.flatten(),
+                                    mode='markers',
+                                    name='preds',
+                                    marker=dict(
+                                        color='#FFB420',
+                                        size=4.5,
+                                        opacity=0.82
+                                    )
+                                )
+
+                            # 更新坐标轴标签
+                            fig_db.update_layout(
+                                xaxis_title=name[0],
+                                yaxis_title=name[1],
+                                legend=dict(
+                                    traceorder="normal"  # 图例顺序按添加顺序排列
+                                )
+                            )
+
+                            # 更新布局
+                            fig_db.update_layout(
+                                title=dict(
+                                    text=f"DPLSR2: {checking_dpls_objs[name].R2[0]:.3f}" if print_pred else f"",
+                                    x=0.55,  # 居中，可调
+                                    xanchor='right',
+                                    font=dict(size=19),
+                                ),
+                                showlegend=False,
+                                height=430,
+                                margin=dict(t=40, b=10, l=7, r=10),
+                                paper_bgcolor='rgba(0,0,0,0)',
+                                plot_bgcolor='rgba(0,0,0,0)',
+                                xaxis=dict(showgrid=False, zeroline=False, showline=False, ticks='',
+                                           showticklabels=True),
+                                yaxis=dict(showgrid=False, zeroline=False, showline=False, ticks='',
+                                           showticklabels=True)
+                            )
+
+                            st.plotly_chart(fig_db, use_container_width=True)
+                            st.markdown("")
+
+        st.markdown("---")
+        time.sleep(1)
+
+st.markdown("")
+st.markdown("")
+st.markdown("<h3 style='text-align: center;'>文件检视面板</h3>", unsafe_allow_html=True)
+st.markdown("")
+st.markdown("---")

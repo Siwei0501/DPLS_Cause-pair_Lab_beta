@@ -17,6 +17,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 from joblib import Parallel, delayed
+from stqdm import stqdm
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
@@ -26,7 +27,7 @@ from sklearn.naive_bayes import GaussianNB
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.svm import SVC
 from sklearn.tree import DecisionTreeClassifier
-from stqdm import stqdm
+
 
 # 导入自定义模块
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
