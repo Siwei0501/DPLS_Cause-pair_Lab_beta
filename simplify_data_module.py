@@ -19,139 +19,6 @@ import random
 
 st.set_page_config(layout="wide")
 
-# 4-2 方法参数映射（用于动态显示对应的子参数控件）
-DPLSR_param_dict = {
-    "cv": {
-        "type": "slider",
-        "label": "多重检验折数",
-        "min": 1,
-        "max": 10,
-        "step": 1,
-        "value": 5
-    },
-    "max_iter": {
-        "type": "slider",
-        "label": "DPLS最大迭代层",
-        "min": 1,
-        "max": 500,
-        "value": 20
-    },
-
-    "power": {
-        "type": "slider",
-        "label": "距离矩阵自乘幂",
-        "min": 0,
-        "max": 10,
-        "value": 0,
-    },
-
-
-    "R_mode": {
-        "type": "select_slider",
-        "label": "求R模式",
-        "help": "[fusion]: 返回整个样本集的DPLSR, [single]: 返回每列的DPLSR",
-        "options": ['fusion', 'single'],
-        "value": 'fusion'
-    },
-
-    "fit_mode": {
-        "type": "selectbox",
-        "label": "Fit-矫正模式",
-        "help": "[Fit]: 纯 Fit, [CV]: 纯 CV, [Fit_rectify]: CV 结果用 Fit 矫正",
-        "options": ["Fit", 'CV', 'Fit_rectify'],
-        "value": "Fit_rectify"
-    },
-
-    "distance_pattern": {
-        "type": "multiselect",
-        "label": "核函数",
-        "help": "[Euc]:欧氏距离. [Mah]:曼哈顿距离, [Pairs]:成对组合距离, [Ming]:闵氏距离",
-        "options": ["Euc", 'Mah', 'Pairs', 'Ming'],
-        "value": "Euc"
-    },
-
-
-    "fit_intercept": {
-        "type": "checkbox",
-        "label": "截距项",
-        "value": False
-    },
-
-    "whiten": {
-        "type": "checkbox",
-        "label": "标准化",
-        "value": False
-    },
-    "square": {
-        "type": "checkbox",
-        "label": "距离矩阵左乘自己的转置",
-        "value": True
-    }
-}
-
-
-# 4-1 方法的描述
-method_descriptions = {
-
-    "DPLSR": "计算 DPLSR ",
-    "PATH": "计算路径增量 Path delta",
-
-    "P_DPLSR": "计算指定 P 的 DPLS",
-    "DPLS_predR": "计算 reason 与 result_pred 之间的 DPLSR。",
-    "chain_stability": "多轮链式 DPLS 拟合，标准差衡量因果路径波动。",
-    "break_DPLSR": "将数据升序排列再分段后分别拟合，统计各段DPLSR之方差用于评估稳定性。",
-    'PersonR': "皮尔逊系数",
-    'variable_coefficient': "变异系数, CV = 方差/均值",
-
-    "PATH_tender": "不同滑动窗口下的 PATH 值序列，观察路径稳定性。",
-    "shuffle_path": "通过混淆样本原顺序, 改变重复值的排列, 提高估计路径结构稳定性。-脆弱的分析, 运行需要稳定的数据",
-    "GS": "使用地统计学核分类的 PATH",
-
-    "DPLSe_KCI": "DPLS(reason, result)的残差与的 reason 的 KCI 值",
-    "DPLSe_P_KCI": "计算指定 P 的 DPLS(reason, result) 的残差与的 reason 的 KCI 值",
-    'DPLSe_HSIC': "DPLS(reason, result)的残差与的 reason 的 HSIC 值",
-    "CMVe_DPLSR": "先排除 reason, result 内协变量的非线性影响, 再计算 reason_clear, result_clear 之间的 DPLSR.",
-    'CMVe_DPLSe_KCI': "先排除 reason, result 内协变量的非线性影响, 再计算 reason_clear, result_clear 之间的 DPLS 残差与 reason_clear 的 KCI。",
-    'aCMV_DPLSe_KCI': "先求出协变量, 把协变量和 reason 按列拼接: a_cmv=[reason,cmv], 再计算 a_cmv 和 result 之间的 DPLS 残差与 a_cmv 的 KCI。",
-
-    "is_Linear": "评估因果关系是否近似线性，返回双向相关系数。",
-
-}
-
-function_dict = {
-    "线性函数": None,
-    "正弦函数": lambda f: np.cos(np.pi * f),
-    "余弦函数": lambda f: np.cos(np.pi * f),
-    "二次函数": lambda f: 2 * (f ** 2),
-    "平方根函数": lambda f: np.sqrt(np.abs(f)),
-    "指数函数": lambda f: np.exp(f),
-    "对数函数（平移）": lambda f: np.log(f + 1),
-    "对数函数（加偏移防负值）": lambda f: np.log(np.abs(f) + 1e-10),
-    "Sigmoid 函数": lambda f: 1 / (1 + np.exp(-6 * f)),
-    "三次多项式函数": lambda f: 2 * (f ** 3) + f ** 2 - 2 * f,
-    "指数幂函数": lambda f: 2 ** (5 * (f + 1)),
-    "高频正弦函数": lambda f: np.sin(2 * np.pi * f),
-    "混合三角+线性函数": lambda f: 0.2 * np.sin(4 * f) + (11 / 10) * f,
-    "高频正弦 + 线性项": lambda f: np.sin(5 * np.pi * f) + f,
-    "高频余弦函数": lambda f: np.cos(6 * np.pi * f),
-    "高频正弦线性混合函数": lambda f: (1 / 10) * np.sin(10.6 * f) + (11 / 10) * f,
-    "非线性频率余弦函数": lambda f: np.cos(5 * np.pi * f * (f + 1)),
-    "非线性频率正弦函数": lambda f: np.sin(4 * np.pi * f * (f + 1)),
-}
-
-
-xtox_func_dict = {
-    "和函数": lambda f: np.sum(f, axis=1),
-    "绝对值和函数": lambda f: np.abs(np.sum(f, axis=1)),
-    "正弦和函数": lambda f: np.sin(np.sum(f, axis=1)),
-    "余弦和函数": lambda f: np.cos(np.sum(f, axis=1)),
-    "正弦积函数": lambda f: np.sin(np.abs(np.prod(f, axis=1))),
-    "余弦积函数": lambda f: np.cos(np.abs(np.prod(f, axis=1))),
-    "积函数": lambda f: np.prod(f, axis=1),
-    "指数积函数": lambda f: np.exp(np.prod(f, axis=1)),
-    "除函数": lambda f: f[:, 0] / np.prod(f, axis=1),
-}
-
 # 实现括号上色的程序1
 def colorize_brackets_by_depth(expr: str) -> str:
     """
@@ -271,7 +138,7 @@ def simplify_data_module(block_id, thread=1):
             <style>
                 .vertical-line {
                     width: 1px;
-                    height: 1646px;
+                    height: 1792px;
                     margin: auto;
                     margin-top: -5px;
                 }
@@ -295,19 +162,20 @@ def simplify_data_module(block_id, thread=1):
     with create_control_panel:
         st.markdown('')
         st.markdown('')
-        create_control_sep0, create_control_panel_ = st.columns([.01, 1])
-    
-        with create_control_panel_:
+        create_control_sep0, create_func_control_panel_expander = st.columns([.01, 1])
+        create_control_sep1, create_output_control_panel_ = st.columns([.01, 1])
+
+        with create_func_control_panel_expander:
     
             st.markdown(
-                "<h3 style='text-align: center;'>函数控制面板</h3>",
+                "<h3 style='text-align: center;'>函数形态控制面板</h3>",
                 unsafe_allow_html=True
             )
     
             st.markdown('---')
             st.markdown("")
-            create_control_panel_expander = st.expander("DPLS_Lab", expanded=True,)
-    
+            # create_func_control_panel_expander = st.expander("DPLS_Lab", expanded=True)
+
     st.markdown('')
     st.markdown('')
     
@@ -388,10 +256,16 @@ def simplify_data_module(block_id, thread=1):
             minus_xtox = st.button("－", key=f"{block_id}_minus_xtox_b")
             if minus_xtox:
                 st.session_state[f"{block_id}_minus_xtox"] = True
+
+        with formular_sep_3:
+
+            formular_sep_3_col1, formular_sep_3_col2, formular_sep_3_col3 = st.columns([.8, .5, .1])
+            with formular_sep_3_col2:
+                formular_name = st.text_input("存储此函数", placeholder="存储此配置", label_visibility="collapsed", key=f"{block_id}_formular_eg_name")
+            with formular_sep_3_col3:
+                st.button("⏬", key=f"{block_id}_formular_eg_name_button", use_container_width=True)
     
-    
-    
-    with create_control_panel_expander:
+    with create_func_control_panel_expander:
 
     
         create_help_dict = {
@@ -676,7 +550,20 @@ def simplify_data_module(block_id, thread=1):
                     create_xseed = st.number_input("x的随机种子", min_value=0, max_value=20000, step=1, value=409, key=f"{block_id}_create_xseed",
                                                    help="输入x数量后, 每个x会在你给出的定义域上随机抽取n个(每个x抽到的不一样, 即使你只给了一个随机种子), x的随机种子用于决定这个抽取过程"
                                                    )
-    
+
+        create_x_bank = st.multiselect(label="**可出现的f(x):**", options=["All"] + list(function_dict.keys()),
+                                       default=["线性函数", "正弦函数", "二次函数"],
+                                       key=f"{block_id}_create_x_bank",
+                                       help=create_help_dict.get("create_x_bank", "无描述"),label_visibility="collapsed"
+
+                                       )
+
+        if f"{block_id}_All" in create_x_bank:
+            create_x_bank = list(function_dict.keys())
+
+        if not create_x_bank:
+            create_x_bank = ["正弦函数"]
+
         create_advanced_sets_expander = st.expander("**高级设置**")
     
         with create_advanced_sets_expander:
@@ -728,18 +615,6 @@ def simplify_data_module(block_id, thread=1):
                                                    help="开启冗余后, 随机种子用于决定冗余的状态"
                                                    )
     
-            create_x_bank = st.multiselect(label="可出现的f(x):", options=["All"] + list(function_dict.keys()),
-                                           default=["线性函数", "正弦函数", "二次函数"], key=f"{block_id}_create_x_bank",
-                                           help= create_help_dict.get("create_x_bank", "无描述")
-    
-                                           )
-    
-            if f"{block_id}_All" in create_x_bank:
-                create_x_bank = list(function_dict.keys())
-    
-            if not create_x_bank:
-                create_x_bank = ["正弦函数"]
-    
     
             create_xtox_bank = st.multiselect(label="可出现的互作函数:", options=["All"] + list(xtox_func_dict.keys()),
                                               default=["积函数", "绝对值和函数", "正弦和函数"], key=f"{block_id}_create_xtox_bank")
@@ -767,7 +642,7 @@ def simplify_data_module(block_id, thread=1):
     
         check_file_button = st.button("**检视**", use_container_width=True, icon="🔍", key=f"{block_id}_check_file_button")
     
-        hr_second(dark_color="#244690", height=2.5, light_color="#26519d")
+
     
         # 7-3 收集参数 ---------------------------------------------------------------------------------------------------
     
@@ -871,24 +746,25 @@ def simplify_data_module(block_id, thread=1):
         st.markdown('')
         st.markdown('')
         st.markdown('')
-        st.markdown("")
-    
-    
+        st.markdown('')
+        st.markdown('')
+
         # 7-5-4 打印公式的latex格式 ---------------------------------------------------------------------------------------
     
         latex_expr = apply_colored_brackets(formula_eg)
         st.latex(latex_expr)
+
+        st.markdown('')
+        st.markdown('')
+        st.markdown('')
+        st.markdown('')
+        st.markdown('')
         st.markdown('')
         st.markdown("")
-        st.markdown('')
-        st.markdown('')
-        st.markdown('')
-        st.markdown('')
-        st.markdown("")
         st.markdown("")
         st.markdown("")
         st.markdown('')
-        st.markdown("<div style='height:28px'></div>", unsafe_allow_html=True)
+        st.markdown("<div style='height:22px'></div>", unsafe_allow_html=True)
         hr_second(dark_color="#244690", height=2.5, light_color="#26519d")
     
     # 独立与互作特征鉴别器(待升级)
@@ -901,9 +777,18 @@ def simplify_data_module(block_id, thread=1):
     
     
     # 读取颜色（默认浅色）
-    
-    with create_control_panel_expander:
-    
+
+
+    with create_output_control_panel_:
+        hr_second(dark_color="#244690", height=2.5, light_color="#26519d")
+        st.markdown("")
+        st.markdown("")
+        st.markdown(
+            "<h3 style='text-align: center;'>输出与DPLS拟合控制面板</h3>",
+            unsafe_allow_html=True
+        )
+        st.markdown("---")
+
         formula_panel1_col1, formula_panel1_col2 = st.columns([.5, .5])
     
         with formula_panel1_col2:
@@ -944,8 +829,7 @@ def simplify_data_module(block_id, thread=1):
             # 7-5-6-1 打印模拟样本的生成参数  -------------------------------------------------------------------------------
     
             with create_exe_expander_2:
-                st.markdown("")
-                st.markdown("")
+                st.markdown("<div style='height:25px'></div>", unsafe_allow_html=True)
                 st.markdown("---")
 
                 direction_panel = st.columns([1, 1])
@@ -1061,8 +945,8 @@ def simplify_data_module(block_id, thread=1):
         st.markdown("")
     
     
-        plot_sep_0, plot_P_col, plot_sep_1,plot_addnoise_col, plot_sep_4, plot_y_exp_col, plot_sep_2, plot_y_obs_col, plot_sep_3, plot_download_col = st.columns(
-            [.01, 1.3,.2,1.3,.2,.5,.2, .5, 2.9, .3])
+        plot_sep_0, plot_P_col, plot_sep_1,plot_addnoise_col, plot_sep_4, plot_y_exp_col, plot_sep_2, plot_y_obs_col, plot_sep_3, plot_DPLSR_col, plot_PrsR_col = st.columns(
+            [.01, 1.3,.2,1.3,.2,.5,.2, .5, 1.2, 1.05, .9])
     
     
         with plot_P_col:
@@ -1100,6 +984,8 @@ def simplify_data_module(block_id, thread=1):
         st.markdown("")
         st.markdown("")
         st.markdown('')
+        st.markdown("")
+        st.markdown('')
     
         with st.spinner("正在拟合..."):
 
@@ -1125,6 +1011,71 @@ def simplify_data_module(block_id, thread=1):
                     pred_obj = st.session_state[f'{block_id}_pred_obj']
 
             st.session_state[f'{block_id}_eg_created'] = True
+
+        with plot_sep_3:
+
+            if DPLS_kwargs["DPLSR"]["R_mode"] == 'single':
+                pass
+            else:
+
+                st.markdown("<div style='height:0px'></div>", unsafe_allow_html=True)
+                st.markdown(
+                    f"""
+                    <h3 style='text-align: right; font-size: 28px; font-weight: bold;'>
+                        P: 
+                        <span style='color: #3580f5; font-size: 30px; font-weight: bold;'>
+                            {pred_obj.p[0] if enforce_P == -1 else enforce_P}
+                        </span>
+                    </h3>
+                    """,
+                    unsafe_allow_html=True
+                )
+
+        with plot_DPLSR_col:
+
+            if DPLS_kwargs["DPLSR"]["R_mode"] == 'single':
+                pass
+            else:
+                st.markdown("<div style='height:0px'></div>", unsafe_allow_html=True)
+                st.markdown(
+                    f"""
+                    <h3 style='text-align: right; font-size: 28px; font-weight: bold;'>
+                        DPLSR: 
+                        <span style='color: #3580f5; font-size: 30px; font-weight: bold;'>
+                            {pred_obj.R2[0] if enforce_P == -1 else pred_obj.y_pred_R2[0][enforce_P] :.2f}
+                        </span>
+                    </h3>
+                    """,
+                    unsafe_allow_html=True
+                )
+            with plot_PrsR_col:
+
+                if DPLS_kwargs["DPLSR"]["R_mode"] == 'single':
+                    st.markdown("<div style='height:0px'></div>", unsafe_allow_html=True)
+                    st.markdown(
+                        f"""
+                        <h3 style='text-align: right; font-size: 28px; font-weight: bold;'>
+                            Single Mode 
+                        </h3>
+                        """,
+                        unsafe_allow_html=True
+                    )
+                else:
+                    st.markdown("<div style='height:0px'></div>", unsafe_allow_html=True)
+                    st.markdown(
+                        f"""
+                        <h3 style='text-align: right; font-size: 28px; font-weight: bold;'>
+                            PrsR: 
+                            <span style='color: #3580f5; font-size: 30px; font-weight: bold;'>
+                                {calculate_corr(y_exp_eg, y_obs_eg)[0]:.2f}
+                            </span>
+                        </h3>
+                        """,
+                        unsafe_allow_html=True
+                    )
+
+
+
 
         # 定义两列
         cols = st.columns(2)
@@ -1164,7 +1115,7 @@ def simplify_data_module(block_id, thread=1):
                     R = pred_obj.y_pred_R2[0][enforce_P]
     
                 P = enforce_P
-    
+
             x_eg_use_i = pd.DataFrame()
             x_eg_use_i[x_i] = pred_obj.X.copy()[:, x]
     

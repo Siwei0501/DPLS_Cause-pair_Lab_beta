@@ -5,6 +5,7 @@ from typing import Tuple
 
 import numpy as np
 import pandas as pd
+from custom_html_module import *
 
 
 def gen_x(sample_num:int=500, param_num:int=2, x_start=-1, x_end=1, x_mode:Literal['uniform', 'grow', 'parabola']='uniform', x_seed=None, **kwargs) -> pd.DataFrame:
@@ -173,27 +174,6 @@ def x_function(x: pd.DataFrame, use_x_num:int, x_num:int, func_seed:int, linear:
     linear_coef = random.uniform(*linear_coef_range)
     linear_intercept = random.uniform(*linear_intercept_range)
 
-    function_dict = {
-        "线性函数":lambda f: linear_coef * f + linear_intercept,
-        "正弦函数": lambda f: np.sin(np.pi*f),
-        "余弦函数": lambda f: np.cos(np.pi * f),
-        "二次函数": lambda f: 2 * (f ** 2),
-        "平方根函数": lambda f: np.sqrt(np.abs(f)),
-        "指数函数": lambda f: np.exp(f),
-        "对数函数（平移）": lambda f: np.log(f + 1),
-        "对数函数（加偏移防负值）": lambda f: np.log(np.abs(f) + 1e-10),
-        "Sigmoid 函数": lambda f: 1 / (1 + np.exp(-6 * f)),
-        "三次多项式函数": lambda f: 2 * (f ** 3) + f ** 2 - 2 * f,
-        "指数幂函数": lambda f: 2 ** (5 * (f + 1)),
-        "高频正弦函数": lambda f: np.sin(6 * np.pi * f),
-        "混合三角+线性函数": lambda f: 0.2 * np.sin(4 * f) + (11 / 10) * f,
-        "高频正弦 + 线性项": lambda f: np.sin(5 * np.pi * f) + f,
-        "高频余弦函数": lambda f: np.cos(6 * np.pi * f),
-        "高频正弦线性混合函数": lambda f: (1 / 10) * np.sin(10.6 * f) + (11 / 10) * f,
-        "非线性频率余弦函数": lambda f: np.cos(6 * np.pi * f * (f + 1)),
-        "非线性频率正弦函数": lambda f: np.sin(6 * np.pi * f * (f + 1)),
-    }
-
     if use_x_func is None:
 
         use_x_func = ["正弦函数", "余弦函数", "二次函数", "平方根函数"]
@@ -211,7 +191,6 @@ def x_function(x: pd.DataFrame, use_x_num:int, x_num:int, func_seed:int, linear:
     def select_func():
         # 定义函数列表及其对应的字符串表示
 
-
         functions_formula = {
             "线性函数": f'(({linear_coef:.2f}){x_mark}＋({linear_intercept:.2f}))',
             "正弦函数": f'sin(π{x_mark})',
@@ -223,8 +202,8 @@ def x_function(x: pd.DataFrame, use_x_num:int, x_num:int, func_seed:int, linear:
             "对数函数（加偏移防负值）": f'log({x_mark})',
             "Sigmoid 函数": f'1/(1＋e^-6{x_mark})',
             "三次多项式函数": f'2{x_mark}^3＋{x_mark}^(2)-2{x_mark}',
-            "指数幂函数": f'2^5({x_mark}＋1)',
-            "高频正弦函数": f'sin(2π{x_mark})',
+            "指数幂函数": f'2^({x_mark}＋1)',
+            "高频正弦函数": f'sin(6π{x_mark})',
             "混合三角+线性函数": f'1/5×sin(4x)＋(11/10)×{x_mark}',
             "高频正弦 + 线性项": f'sin(5π{x_mark})＋{x_mark}',
             "高频余弦函数": f'cos(6π{x_mark})',

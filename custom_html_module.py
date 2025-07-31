@@ -8,6 +8,557 @@ from joblib import Parallel, delayed
 from stqdm import stqdm
 from typing import Literal, Union, Callable
 from cause_pair_functions.DPLS_jj import DPLS
+from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.naive_bayes import GaussianNB
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.svm import SVC
+from sklearn.tree import DecisionTreeClassifier
+
+function_dict = {
+    "线性函数": None,
+    "正弦函数": lambda f: np.cos(np.pi * f),
+    "余弦函数": lambda f: np.cos(np.pi * f),
+    "二次函数": lambda f: 2 * (f ** 2),
+    "平方根函数": lambda f: np.sqrt(np.abs(f)),
+    "指数函数": lambda f: np.exp(f),
+    "对数函数（平移）": lambda f: np.log(f + 1),
+    "对数函数（加偏移防负值）": lambda f: np.log(np.abs(f) + 1e-10),
+    "Sigmoid 函数": lambda f: 1 / (1 + np.exp(-6 * f)),
+    "三次多项式函数": lambda f: 2 * (f ** 3) + f ** 2 - 2 * f,
+    "指数幂函数": lambda f: 2 ** (f + 1),
+    "高频正弦函数": lambda f: np.sin(6 * np.pi * f),
+    "混合三角+线性函数": lambda f: 0.2 * np.sin(4 * f) + (11 / 10) * f,
+    "高频正弦 + 线性项": lambda f: np.sin(5 * np.pi * f) + f,
+    "高频余弦函数": lambda f: np.cos(6 * np.pi * f),
+    "高频正弦线性混合函数": lambda f: (1 / 10) * np.sin(10.6 * f) + (11 / 10) * f,
+    "非线性频率余弦函数": lambda f: np.cos(5 * np.pi * f * (f + 1)),
+    "非线性频率正弦函数": lambda f: np.sin(4 * np.pi * f * (f + 1)),
+}
+
+
+xtox_func_dict = {
+    "和函数": lambda f: np.sum(f, axis=1),
+    "绝对值和函数": lambda f: np.abs(np.sum(f, axis=1)),
+    "正弦和函数": lambda f: np.sin(np.sum(f, axis=1)),
+    "余弦和函数": lambda f: np.cos(np.sum(f, axis=1)),
+    "正弦积函数": lambda f: np.sin(np.abs(np.prod(f, axis=1))),
+    "余弦积函数": lambda f: np.cos(np.abs(np.prod(f, axis=1))),
+    "积函数": lambda f: np.prod(f, axis=1),
+    "指数积函数": lambda f: np.exp(np.prod(f, axis=1)),
+    "除函数": lambda f: f[:, 0] / np.prod(f, axis=1),
+}
+
+
+# 3-1 描述预处理
+preprocess_descriptions = {
+
+    "normalize": "标准化",
+    "regionalitze": "区域化,默认区域[-1,1]",
+    "Sort_by_reason": "样本根据原因升序排列",
+    "Xmean": "把X分组, 每组取平均值,以此获得平滑的新X",
+    "drop_Bias":"去除偏倚值",
+    "drop_NA":"去除空值",
+    "drop_duplicates_mean": "去除 reason 重复数据, result 取均值",
+    "add_noise": "对数据添加随机噪声",
+    "subsidiary_sampling": "组子采样, 把样本升序排列后分割成等宽的小组, 在每个小组内抽一个组成新样本集",
+
+    "to_DPLS_pred": "把 result 替换为 DPLS 预测值",
+    "None": "无预处理",
+
+}
+
+# 3-2 预处理的参数映射
+preprocess_param_controls = {
+
+    "normalize": {
+        'nan_mode': {"type": "selectbox", "label": "空值应对策略",
+                     "options": ['no', '0', 'mean'], "value": 'no', "help": "[no]: 仅呈递, [0]: 替换为0, [mean]: 替换为均值"},
+
+        'axis': {"type": "selectbox", "label": "方向", "help":"[1]: 按列标准化, [0], 按行标准化",
+                 "options": [1, 0], "value": 1},
+    },
+
+    "regionalitze": {
+        'nan_mode': {"type": "selectbox", "label": "空值应对策略","help":"[no]: 仅呈递, [0]: 替换为0, [mean]: 替换为均值",
+
+                     "options": ['no', '0', 'mean'], "value": 'no'},
+
+        'axis': {"type": "selectbox", "label": "方向","help":"[1]: 按列归一化, [0], 按行归一化",
+                 "options": [1, 0], "value": 1},
+    },
+
+    "add_noise": {
+        'noise_level': {"type": "slider", "label": "噪音强度", "min": 0.0, "max": 10.0, "value": 0.5, "step": 0.05},
+        'add_on': {"type": "selectbox",
+                   "label": "噪音添加位置","help":"[reason]: 噪音加在 reason 上, [result], 噪音加在 result 上",
+                   "options": ['reason', 'result'], "value": 'result'},
+        'noise_mode': {"type": "selectbox", "label": "噪音模式","help":"[normal]: 添加高斯噪音, [uniform], 添加均匀噪音",
+                       "options": ['normal', 'uniform'], "value": 'normal'},
+        'adjust': {"type": "checkbox", "label": "自适应噪音强度", "value": False, "help":"( noise_level *= DPLSR^2 )"},
+
+    },
+
+    "subsidiary_sampling": {
+        'subsidiary_width': {"type": "slider", "label": "组大小", "min": 2, "max": 5, "value": 2, "step": 1},
+    },
+
+    "to_DPLS_pred": {
+    "cv": {
+        "type": "slider",
+        "label": "多重检验折数",
+        "min": 1, "max": 10, "step": 1, "value": 5
+    },
+    "max_iter": {
+        "type": "slider",
+        "label": "DPLS最大迭代层",
+        "min": 1, "max": 500, "value": 20
+    },
+    "R_mode": {
+        "type": "selectslider",
+        "label": "求R模式",
+        "help": "[fusion]: 返回整个样本集的DPLSR, [single]: 返回每列的DPLSR",
+        "options": ['fusion', 'single'],
+        "value": 'fusion'
+    },
+    "distance_pattern": {
+        "type": "selectbox",
+        "label": "距离矩阵种类",
+        "help": "[Euc]:欧氏距离. [Mah]:曼哈顿距离, [Pairs]:成对组合距离, [Ming]:闵氏距离",
+        "options": ["Euc", 'Mah', 'Pairs', 'Ming'],
+        "value": "Euc"
+    },
+    "whiten": {
+        "type": "checkbox",
+        "label": "标准化",
+        "value": False
+    },
+    "square": {
+        "type": "checkbox",
+        "label": "距离矩阵左乘自己的转置",
+        "value": False
+    },
+},
+
+    "Xmean": {
+    "mean_ratio": {
+        "type": "slider",
+        "label": "分组率, 分组越多则平滑程度越低",
+        "min": 0.1, "max": 1.0, "step": 0.1, "value": 0.5
+    },
+    "Xmean_mode": {
+        "type": "selectbox",
+        "label": "分组模式",
+        "help": "[uniform]: 每组宽度相等, [normal]: 每组概率相等",
+        "options": ['normal', 'uniform'],
+        "value": 'normal'
+    },
+    "Xmean_window": {
+        "type": "slider",
+        "label": "窗口长度, 即'勾搭臂长'",
+        "min": 1, "max": 10, "step": 1, "value": 2
+    },
+},
+
+    "drop_Bias": {
+    "Bias_threshold": {
+        "type": "slider",
+        "label": "界定偏倚值的σ阈值",
+        "min": 1.5, "max": 5.0, "step": 0.1, "value": 3.0
+    },
+}
+
+}
+
+# 4-1 方法的描述
+method_descriptions = {
+
+    "DPLSR": "计算 DPLSR ",
+    "PATH": "计算路径增量 Path delta",
+
+    "P_DPLSR": "计算指定 P 的 DPLS",
+    "DPLS_predR": "计算 reason 与 result_pred 之间的 DPLSR。",
+    "chain_stability": "多轮链式 DPLS 拟合，标准差衡量因果路径波动。",
+    "break_DPLSR": "将数据升序排列再分段后分别拟合，统计各段DPLSR之方差用于评估稳定性。",
+    'PersonR': "皮尔逊系数",
+    'variable_coefficient': "变异系数, CV = 方差/均值",
+
+    "PATH_tender": "不同滑动窗口下的 PATH 值序列，观察路径稳定性。",
+    "shuffle_path": "通过混淆样本原顺序, 改变重复值的排列, 提高估计路径结构稳定性。-脆弱的分析, 运行需要稳定的数据",
+    "GS": "使用地统计学核分类的 PATH",
+
+    "DPLSe_KCI": "DPLS(reason, result)的残差与的 reason 的 KCI 值",
+    "DPLSe_P_KCI": "计算指定 P 的 DPLS(reason, result) 的残差与的 reason 的 KCI 值",
+    'DPLSe_HSIC': "DPLS(reason, result)的残差与的 reason 的 HSIC 值",
+    "CMVe_DPLSR": "先排除 reason, result 内协变量的非线性影响, 再计算 reason_clear, result_clear 之间的 DPLSR.",
+    'CMVe_DPLSe_KCI': "先排除 reason, result 内协变量的非线性影响, 再计算 reason_clear, result_clear 之间的 DPLS 残差与 reason_clear 的 KCI。",
+    'aCMV_DPLSe_KCI': "先求出协变量, 把协变量和 reason 按列拼接: a_cmv=[reason,cmv], 再计算 a_cmv 和 result 之间的 DPLS 残差与 a_cmv 的 KCI。",
+
+    "is_Linear": "评估因果关系是否近似线性，返回双向相关系数。",
+
+}
+
+# 4-2 方法参数映射（用于动态显示对应的子参数控件）
+DPLSR_param_dict = {
+    "cv": {
+        "type": "slider",
+        "label": "多重检验折数",
+        "min": 1,
+        "max": 10,
+        "step": 1,
+        "value": 5
+    },
+    "max_iter": {
+        "type": "slider",
+        "label": "DPLS最大迭代层",
+        "min": 1,
+        "max": 500,
+        "value": 20
+    },
+
+    "power": {
+        "type": "slider",
+        "label": "距离矩阵自乘幂",
+        "min": 0,
+        "max": 10,
+        "value": 0,
+    },
+
+
+    "R_mode": {
+        "type": "select_slider",
+        "label": "求R模式",
+        "help": "[fusion]: 返回整个样本集的DPLSR, [single]: 返回每列的DPLSR",
+        "options": ['fusion', 'single'],
+        "value": 'fusion'
+    },
+
+    "fit_mode": {
+        "type": "selectbox",
+        "label": "Fit-矫正模式",
+        "help": "[Fit]: 纯 Fit, [CV]: 纯 CV, [Fit_rectify]: CV 结果用 Fit 矫正",
+        "options": ["Fit", 'CV', 'Fit_rectify'],
+        "value": "Fit_rectify"
+    },
+
+    "distance_pattern": {
+        "type": "multiselect",
+        "label": "核函数",
+        "help": "[Euc]:欧氏距离. [Mah]:曼哈顿距离, [Pairs]:成对组合距离, [Ming]:闵氏距离",
+        "options": ["Euc", 'Mah', 'Pairs', 'Ming'],
+        "value": "Euc"
+    },
+
+
+    "fit_intercept": {
+        "type": "checkbox",
+        "label": "截距项",
+        "value": False
+    },
+
+    "whiten": {
+        "type": "checkbox",
+        "label": "标准化",
+        "value": False
+    },
+    "square": {
+        "type": "checkbox",
+        "label": "距离矩阵左乘自己的转置",
+        "value": True
+    }
+}
+
+PATH_param_dict = {
+    "Path_centre": {"type": "checkbox", "label": "中心化后再求 PATH", "value": False},
+    "Path_normal": {"type": "checkbox", "label": "PATH 除以输入样本的标准差", "value": False},
+    "Path_window": {"type": "slider", "label": "delta间隔", "min": 1, "max": 10, "value": 1},
+    "Sort_by": {"type": "selectbox",
+                "label": "排序模式", "help":"[reason]: 仅根据 reason 排序,重复值保留原始顺序, [all]: result 参与排序,作为排序的次级依据",
+                "options": ["all", "reason", ], "value": "all"},
+}
+
+
+method_param_controls = {
+
+    "DPLSR": {
+
+         "need_P": {
+             "type": "checkbox",
+             "label": "返回选择的P",
+             "value": False,
+         },
+
+         "need_Rs":{
+             "type": "checkbox",
+             "label": "返回每个P的R2",
+             "value": False,
+         },
+             } | DPLSR_param_dict,
+
+    "P_DPLSR": {
+        "P_mode": {
+            "type": "selectbox",
+            "label": "选择P类型",
+            "help": "在P_AB,P_BA中, [min]: P_min, [max]:P_max, [mean]: P_mean",
+            "options": ['min', 'max', 'mean'],
+            "value": "mean"
+        }
+    } | DPLSR_param_dict,
+
+    "DPLS_predR": {} | DPLSR_param_dict,
+
+    "PATH": {} | PATH_param_dict,
+
+    "GS": {
+        "GS_core": {
+            "type": "selectbox",
+            "label": "核函数类型",
+            "options": ["Matern"],
+            "value": "Matern"
+        },
+        "GS_ratio": {
+            "type": "slider",
+            "label": "比例参数, 0.5倍极差内的样本数 n^value",
+            "min": 0.1,
+            "max": 1.0,
+            "step": 0.1,
+            "value": 0.6
+        }
+    } | PATH_param_dict,
+
+    "shuffle_path": {
+        "Shuffle_times": {
+            "type": "slider",
+            "label": "混淆次数",
+            "min": 10,
+            "max": 2000,
+            "step": 10,
+            "value": 1000
+        }
+    } | PATH_param_dict,
+
+    "break_DPLSR": {
+        "break_parts": {
+            "type": "slider",
+            "label": "断点分段数",
+            "min": 2,
+            "max": 10,
+            "step": 1,
+            "value": 3
+        }
+    } | DPLSR_param_dict,
+
+    "chain_stability": {
+        "Chain_mode": {
+            "type": "selectbox",
+            "label": "链式模式",
+            "options": ["flow", "tree"],
+            "value": "flow"
+        },
+        "Chain_len": {
+            "type": "slider",
+            "label": "链长度",
+            "min": 2,
+            "max": 10,
+            "step": 1,
+            "value": 3
+        }
+    } | DPLSR_param_dict,
+
+    "PATH_tender": {
+        "Tender_length": {
+            "type": "slider",
+            "label": "倾向分析",
+            "min": 2,
+            "max": 10,
+            "step": 1,
+            "value": 5
+        }
+    } | PATH_param_dict,
+
+    "PersonR": {
+        "R2": {
+            "type": "checkbox",
+            "label": "返回R^2",
+            "value": True
+        }
+    },
+
+    "DPLSe_KCI": {} | DPLSR_param_dict,
+
+    "DPLSe_P_KCI": {
+        "P_mode": {
+            "type": "selectbox",
+            "label": "选择P类型",
+            "help": "在P_AB,P_BA中, [min]: P_min, [max]:P_max, [mean]: P_mean",
+            "options": ['min', 'max', 'mean'],
+            "value": "mean"
+        }
+    } | DPLSR_param_dict,
+
+    "CMVe_DPLSR": {
+        "CMV_mode": {
+            "type": "selectbox",
+            "label": "协变量来源",
+            "help": "[distance]: 来自A&B构成的距离矩阵, [origin]: 来自A&B原始矩阵",
+            "options": ['distance', 'origin'],
+            "value": 'distance'
+        },
+        "CMV_num": {
+            "type": "slider",
+            "label": "协变量数量 (距离矩阵的前n个主成分)",
+            "min": 1,
+            "max": 50,
+            "value": 1
+        }
+    } | DPLSR_param_dict,
+
+    "CMVe_DPLSe_KCI": {
+        "CMV_mode": {
+            "type": "selectbox",
+            "label": "协变量来源",
+            "help": "[distance]: 来自A&B构成的距离矩阵, [origin]: 来自A&B原始矩阵",
+            "options": ['distance', 'origin'],
+            "value": 'distance'
+        },
+        "CMV_num": {
+            "type": "slider",
+            "label": "协变量数量 (距离矩阵的前n个主成分)",
+            "min": 1,
+            "max": 50,
+            "value": 1
+        }
+    } | DPLSR_param_dict,
+
+    "aCMV_DPLSe_KCI": {
+        "CMV_mode": {
+            "type": "selectbox",
+            "label": "协变量来源",
+            "help": "[distance]: 来自 A&B 的融合距离矩阵, [origin]: 来自 A&B 原始矩阵拼接",
+            "options": ['distance', 'origin'],
+            "value": 'distance'
+        },
+        "CMV_num": {
+            "type": "slider",
+            "label": "协变量数量 (距离矩阵的前n个主成分)",
+            "min": 1,
+            "max": 50,
+            "value": 1
+        }
+    } | DPLSR_param_dict,
+
+    "is_Linear": {
+        "Test_times": {
+            "type": "slider",
+            "label": "测试次数",
+            "help": "is_Linear的判断基于多次测试",
+            "min": 1,
+            "max": 20,
+            "value": 5
+        },
+        "Test_ratio": {
+            "type": "slider",
+            "label": "测试比例",
+            "help": "每次测试抽取的样本数占总样本的比例",
+            "min": 0.1,
+            "max": 0.9,
+            "step": 0.05,
+            "value": 0.7
+        }
+    } | DPLSR_param_dict,
+
+}
+
+# 5-1 分类器的描述
+classify_description = {
+    "Logistic_classifyn": "用于二分类或多分类问题，通过逻辑函数输出概率值，简单高效，适合线性可分数据。",
+
+    "Decision_Tree": "通过构建树结构进行决策，易于理解和可视化，能够处理非线性关系但容易过拟合。",
+
+    "Random_Forest": "集成多个决策树，通过投票方式提高准确率，减少过拟合，适合高维数据。",
+
+    "SVM": "支持向量机用于寻找最佳分类边界，支持非线性分类（核函数），在高维空间表现良好。",
+
+    "KNN": "K近邻通过测量样本之间的距离，找出最近的K个邻居进行投票分类，适合小数据量问题。",
+
+    "Naive_Bayes": "基于贝叶斯定理和特征条件独立假设，计算效率高，适合文本分类等高维稀疏数据。",
+
+    "LDA": "线性判别分析，通过最大化类间方差与最小化类内方差来进行分类，也常用于降维。",
+
+}
+
+# 5-2 引用分类器
+classify_dict = {
+    "Logistic_Regression": LogisticRegression(),
+    "Decision_Tree": DecisionTreeClassifier(),
+    "Random_Forest": RandomForestClassifier(),
+    "SVM": SVC(probability=True),  # 设置 probability=True 以支持 predict_proba
+    "KNN": KNeighborsClassifier(),
+    "Naive_Bayes": GaussianNB(),
+    "LDA": LinearDiscriminantAnalysis(),
+
+}
+
+# 5-3 分类器参数映射
+classify_param_control = {
+
+    "Logistic_classifyn": {
+        "C": {"type": "slider", "label": "正则化强度 C", "min": 0.01, "max": 10.0, "value": 1.0, "step": 0.01},
+        "max_iter": {"type": "slider", "label": "最大迭代次数", "min": 100, "max": 10000, "value": 1000, "step": 100},
+        "penalty": {"type": "selectbox", "label": "正则化类型", "options": ["l2", "l1", "elasticnet", "none"],
+                    "value": "l2"},
+        "solver": {"type": "selectbox", "label": "优化器", "options": ["lbfgs", "liblinear", "saga", "newton-cg"],
+                   "value": "lbfgs"},
+
+        "parameter_optimization":{"type": "checkbox", "label": "自动参数寻优", "value":True },
+
+    },
+
+    "Decision_Tree": {
+        "max_depth": {"type": "slider", "label": "最大深度", "min": 1, "max": 30, "value": None},
+        "min_samples_split": {"type": "slider", "label": "最小划分样本数", "min": 2, "max": 20, "value": 2},
+        "criterion": {"type": "selectbox", "label": "划分标准", "options": ["gini", "entropy", "log_loss"],
+                      "value": "gini"},
+        "parameter_optimization":{"type": "checkbox", "label": "自动参数寻优", "value":True },
+    },
+
+    "Random_Forest": {
+        "n_estimators": {"type": "slider", "label": "树的数量", "min": 10, "max": 300, "value": 100, "step": 10},
+        "max_depth": {"type": "slider", "label": "最大深度", "min": 1, "max": 30, "value": None},
+        "min_samples_split": {"type": "slider", "label": "最小划分样本数", "min": 2, "max": 20, "value": 2},
+        "criterion": {"type": "selectbox", "label": "划分标准", "options": ["gini", "entropy", "log_loss"],
+                      "value": "gini"},
+        "parameter_optimization":{"type": "checkbox", "label": "自动参数寻优", "value":True },
+    },
+
+    "SVM": {
+        "C": {"type": "slider", "label": "惩罚参数 C", "min": 0.1, "max": 100.0, "value": 1.0, "step": 0.1},
+        "kernel": {"type": "selectbox", "label": "核函数类型", "options": ["rbf", "linear", "poly", "sigmoid"],
+                   "value": "rbf"},
+        "gamma": {"type": "selectbox", "label": "核系数 gamma", "options": ["scale", "auto"], "value": "scale"},
+        "parameter_optimization":{"type": "checkbox", "label": "自动参数寻优", "value":True },
+    },
+
+    "KNN": {
+        "n_neighbors": {"type": "slider", "label": "邻居数量", "min": 1, "max": 20, "value": 5},
+        "weights": {"type": "selectbox", "label": "加权策略", "options": ["uniform", "distance"], "value": "uniform"},
+        "metric": {"type": "selectbox", "label": "距离度量", "options": ["minkowski", "euclidean", "manhattan"],
+                   "value": "minkowski"},
+        "parameter_optimization":{"type": "checkbox", "label": "自动参数寻优", "value":True },
+    },
+
+    "Naive_Bayes": {
+        # GaussianNB参数少，通常无需调参，可作为 baseline
+    },
+
+    "LDA": {
+        "solver": {"type": "selectbox", "label": "求解器", "options": ["svd", "lsqr", "eigen"], "value": "svd"},
+        "shrinkage": {"type": "selectbox", "label": "收缩策略", "options": [None, "auto", "float"], "value": None},
+        "parameter_optimization": {"type": "checkbox", "label": "自动参数寻优", "value": True},
+    },
+
+}
 
 # 多重检验分折器
 def spliter(sample_num, cv: int = 5, mode: Literal['uniform', 'layers'] = 'layers', random_before: bool = False,
