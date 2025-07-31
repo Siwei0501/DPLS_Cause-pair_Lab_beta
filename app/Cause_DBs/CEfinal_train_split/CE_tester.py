@@ -1,6 +1,6 @@
 import os
 
-from cause_pair_functions.casual_pair_tester_py310 import return_Cause_DF, Pre_process_Iterable, Method_Option
+from cause_pair_functions.casual_pair_tester import return_Cause_DF, Pre_process_Iterable, Method_Option
 from pair_data_presenter import return_cause_pair
 from typing import Literal
 import random
@@ -18,7 +18,7 @@ Thread = 1  # 多线程不能调试改成 1-
 Threshold = [500, 1000]
 Test_flies_num = 50
 
-Kwargs = {}
+Kwargs = {'_R2_':True, "_y_pred_R2_":True}
 # Pre_process: Pre_process_Iterable = ['normalize', 'regionalitze', 'drop_duplicates_mean', 'add_noise', 'subsidiary_sampling']
 Pre_process: Pre_process_Iterable = ['normalize']
 
@@ -33,7 +33,7 @@ else:
     Kwargs_name:list = [f"{key}={value}" for key, value in Kwargs.items()]
     Kwargs_name = '_{' + '-'.join(Kwargs_name) + '}'
 
-Method: Method_Option = 'chain_stability'
+Method: Method_Option = 'DPLS'
 read_files, file_names, files_causes = return_cause_pair(relation=Relation, threshold=Threshold, test_SAMPLE=Test_flies_num, seed=test_seed)
 
 result_list = []
@@ -51,5 +51,5 @@ if os.path.exists(rf'analysis/{Method}'):
 else:
     os.mkdir(rf'analysis/{Method}')
     print(f'已创建临时文件夹 analysis/{Method}')
-
+print(result_DF)
 result_DF.to_excel(rf'analysis/{Method}/{Relation}_{Threshold[0]}-{Threshold[1]}_{Test_flies_num}-CE_{Pre_process_name}{Kwargs_name}_{Method}.xlsx')

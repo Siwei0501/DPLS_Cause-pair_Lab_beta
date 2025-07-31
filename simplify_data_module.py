@@ -19,219 +19,6 @@ import random
 
 st.set_page_config(layout="wide")
 
-# 4-2 方法参数映射（用于动态显示对应的子参数控件）
-DPLSR_param_dict = {
-    "cv": {
-        "type": "slider",
-        "label": "多重检验折数",
-        "min": 1,
-        "max": 10,
-        "step": 1,
-        "value": 5
-    },
-    "max_iter": {
-        "type": "slider",
-        "label": "DPLS最大迭代层",
-        "min": 1,
-        "max": 500,
-        "value": 20
-    },
-
-    "power": {
-        "type": "slider",
-        "label": "距离矩阵自乘幂",
-        "min": 0,
-        "max": 10,
-        "value": 0,
-    },
-
-
-    "R_mode": {
-        "type": "select_slider",
-        "label": "求R模式",
-        "help": "[fusion]: 返回整个样本集的DPLSR, [single]: 返回每列的DPLSR",
-        "options": ['fusion', 'single'],
-        "value": 'fusion'
-    },
-
-    "fit_mode": {
-        "type": "selectbox",
-        "label": "Fit-矫正模式",
-        "help": "[Fit]: 纯 Fit, [CV]: 纯 CV, [Fit_rectify]: CV 结果用 Fit 矫正",
-        "options": ["Fit", 'CV', 'Fit_rectify'],
-        "value": "Fit_rectify"
-    },
-
-    "distance_pattern": {
-        "type": "multiselect",
-        "label": "核函数",
-        "help": "[Euc]:欧氏距离. [Mah]:曼哈顿距离, [Pairs]:成对组合距离, [Ming]:闵氏距离",
-        "options": ["Euc", 'Mah', 'Pairs', 'Ming'],
-        "value": "Euc"
-    },
-
-
-    "fit_intercept": {
-        "type": "checkbox",
-        "label": "截距项",
-        "value": False
-    },
-
-    "whiten": {
-        "type": "checkbox",
-        "label": "标准化",
-        "value": False
-    },
-    "square": {
-        "type": "checkbox",
-        "label": "距离矩阵左乘自己的转置",
-        "value": True
-    }
-}
-
-
-# 4-1 方法的描述
-method_descriptions = {
-
-    "DPLSR": "计算 DPLSR ",
-    "PATH": "计算路径增量 Path delta",
-
-    "P_DPLSR": "计算指定 P 的 DPLS",
-    "DPLS_predR": "计算 reason 与 result_pred 之间的 DPLSR。",
-    "chain_stability": "多轮链式 DPLS 拟合，标准差衡量因果路径波动。",
-    "break_DPLSR": "将数据升序排列再分段后分别拟合，统计各段DPLSR之方差用于评估稳定性。",
-    'PersonR': "皮尔逊系数",
-    'variable_coefficient': "变异系数, CV = 方差/均值",
-
-    "PATH_tender": "不同滑动窗口下的 PATH 值序列，观察路径稳定性。",
-    "shuffle_path": "通过混淆样本原顺序, 改变重复值的排列, 提高估计路径结构稳定性。-脆弱的分析, 运行需要稳定的数据",
-    "GS": "使用地统计学核分类的 PATH",
-
-    "DPLSe_KCI": "DPLS(reason, result)的残差与的 reason 的 KCI 值",
-    "DPLSe_P_KCI": "计算指定 P 的 DPLS(reason, result) 的残差与的 reason 的 KCI 值",
-    'DPLSe_HSIC': "DPLS(reason, result)的残差与的 reason 的 HSIC 值",
-    "CMVe_DPLSR": "先排除 reason, result 内协变量的非线性影响, 再计算 reason_clear, result_clear 之间的 DPLSR.",
-    'CMVe_DPLSe_KCI': "先排除 reason, result 内协变量的非线性影响, 再计算 reason_clear, result_clear 之间的 DPLS 残差与 reason_clear 的 KCI。",
-    'aCMV_DPLSe_KCI': "先求出协变量, 把协变量和 reason 按列拼接: a_cmv=[reason,cmv], 再计算 a_cmv 和 result 之间的 DPLS 残差与 a_cmv 的 KCI。",
-
-    "is_Linear": "评估因果关系是否近似线性，返回双向相关系数。",
-
-}
-
-function_dict = {
-    "线性函数": None,
-    "正弦函数": lambda f: np.cos(np.pi * f),
-    "余弦函数": lambda f: np.cos(np.pi * f),
-    "二次函数": lambda f: 2 * (f ** 2),
-    "平方根函数": lambda f: np.sqrt(np.abs(f)),
-    "指数函数": lambda f: np.exp(f),
-    "对数函数（平移）": lambda f: np.log(f + 1),
-    "对数函数（加偏移防负值）": lambda f: np.log(np.abs(f) + 1e-10),
-    "Sigmoid 函数": lambda f: 1 / (1 + np.exp(-6 * f)),
-    "三次多项式函数": lambda f: 2 * (f ** 3) + f ** 2 - 2 * f,
-    "指数幂函数": lambda f: 2 ** (5 * (f + 1)),
-    "高频正弦函数": lambda f: np.sin(2 * np.pi * f),
-    "混合三角+线性函数": lambda f: 0.2 * np.sin(4 * f) + (11 / 10) * f,
-    "高频正弦 + 线性项": lambda f: np.sin(5 * np.pi * f) + f,
-    "高频余弦函数": lambda f: np.cos(6 * np.pi * f),
-    "高频正弦线性混合函数": lambda f: (1 / 10) * np.sin(10.6 * f) + (11 / 10) * f,
-    "非线性频率余弦函数": lambda f: np.cos(5 * np.pi * f * (f + 1)),
-    "非线性频率正弦函数": lambda f: np.sin(4 * np.pi * f * (f + 1)),
-}
-
-
-xtox_func_dict = {
-    "和函数": lambda f: np.sum(f, axis=1),
-    "绝对值和函数": lambda f: np.abs(np.sum(f, axis=1)),
-    "正弦和函数": lambda f: np.sin(np.sum(f, axis=1)),
-    "余弦和函数": lambda f: np.cos(np.sum(f, axis=1)),
-    "正弦积函数": lambda f: np.sin(np.abs(np.prod(f, axis=1))),
-    "余弦积函数": lambda f: np.cos(np.abs(np.prod(f, axis=1))),
-    "积函数": lambda f: np.prod(f, axis=1),
-    "指数积函数": lambda f: np.exp(np.prod(f, axis=1)),
-    "除函数": lambda f: f[:, 0] / np.prod(f, axis=1),
-}
-
-# 实现括号上色的程序1
-def colorize_brackets_by_depth(expr: str) -> str:
-    """
-    对表达式中的括号进行着色，按嵌套层级循环使用不同颜色，
-    并正确处理 LaTeX 中指数符号（^）所需的大括号匹配问题。
-
-    参数:
-        expr (str): 传入的原始字符串表达式（例如 "y = 2(2(x_2)^2)^2"）
-
-    返回:
-        str: 添加 LaTeX 颜色标签后的表达式，可直接用于 st.latex() 渲染
-    """
-    colors = ['orange', 'red', 'blue', 'yellow', "green", "violet", 'brown', "lime"]
-    num_colors = len(colors)
-    result = ''  # 最终拼接的 LaTeX 字符串
-    depth = 0  # 括号嵌套深度
-    stack = []  # 颜色栈，用于匹配每个左括号的颜色
-    char_energy = np.array([])  # 存储每个 ^ 所在时的括号层级，用于后续决定在哪里闭合大括号
-    char_len = len(expr)
-
-    # 遍历每个字符
-    for i, char in enumerate(expr):
-
-        if char == '^':
-            # 遇到 ^ 开启指数，追加 ^{ 并记录当前 depth
-            result += '^' + '{'
-            char_energy = np.append(char_energy, depth)
-
-        elif char == '(':
-            # 左括号，根据当前 depth 上色并入栈
-            color = colors[depth % num_colors]
-            result += rf'\textcolor{{{color}}}{{(}}'
-            stack.append(color)
-            depth += 1
-
-        elif char == ')':
-
-            # 右括号，先结束 ^ 开启的大括号（若满足闭合条件）
-
-            if stack:
-                color = stack.pop()
-            else:
-                color = colors[0]  # 兜底：括号不匹配时默认颜色
-
-            # 统计在当前 depth 下应该关闭多少个 ^ 所开启的大括号
-            energy_exhausted = char_energy >= depth - 1
-            char_energy = char_energy[char_energy < depth - 1]
-
-            # 加上当前层级右括号
-
-            result += "}" * np.sum(energy_exhausted)  # 添加闭合括号
-            depth -= 1
-            result += rf'\textcolor{{{color}}}{{)}}'
-
-        else:
-            # 普通字符直接加入结果
-            result += char
-
-        # 若到达末尾，补齐所有未关闭的大括号
-        if i == char_len - 1:
-            result += "}" * len(char_energy)
-
-    return result
-
-
-# 实现括号上色的程序2
-def apply_colored_brackets(expr: str) -> str:
-    """
-    对整个表达式按加号（+）分隔后逐段处理括号着色。
-
-    参数:
-        expr (str): 传入的表达式（例如 "y = 2(2(x_2)^2)^2 + sin(πx_1)"）
-
-    返回:
-        str: 添加括号颜色的完整表达式
-    """
-    terms = expr.split('+')
-    colored_terms = [colorize_brackets_by_depth(term.strip()) for term in terms]
-    return ' + '.join(colored_terms)
-
 
 @st.cache_data(show_spinner=False)
 def export_multiple_plots_to_zip(fig_dict: dict[str, go.Figure]) -> bytes:
@@ -256,22 +43,29 @@ def export_multiple_plots_to_zip(fig_dict: dict[str, go.Figure]) -> bytes:
 
 # 7-2-2 与 本地文件模式共用的功能部分 --------------------------------------------------------------------------------
 
-# 模拟样本的独立功能区, 单独于 host_panel_setting 外 -------------------------------------------------------------------------
+# 模拟样本的独立功能区, 单独于 host_panel_check_file 外 -------------------------------------------------------------------------
 
 def simplify_data_module(block_id, thread=1):
     
     hr_second(dark_color="#244690", height=2, light_color="#26519d")
     
     # 7-2-3 定义生成模拟数据的控制面板 ---------------------------------------------------------------------------------------
-    use_files_dict={}
-    create_control_panel, create_sep1, create_preview_panel = st.columns([.382, 0.022, .618])
+    if st.session_state.get(f"{block_id}_use_files_dict", False):
+
+        use_files_dict = st.session_state.get(f"{block_id}_use_files_dict")
+
+    else:
+
+        use_files_dict = {}
+
+    create_control_panel, create_sep1, create_preview_panel = st.columns([.382, 0.026, .618])
     
     with create_sep1:
         st.markdown("""
             <style>
                 .vertical-line {
                     width: 1px;
-                    height: 1646px;
+                    height: 1722px;
                     margin: auto;
                     margin-top: -5px;
                 }
@@ -295,19 +89,20 @@ def simplify_data_module(block_id, thread=1):
     with create_control_panel:
         st.markdown('')
         st.markdown('')
-        create_control_sep0, create_control_panel_ = st.columns([.01, 1])
-    
-        with create_control_panel_:
+        create_control_sep0, create_func_control_panel_expander = st.columns([.01, 1])
+        create_control_sep1, create_output_control_panel_ = st.columns([.01, 1])
+
+        with create_func_control_panel_expander:
     
             st.markdown(
-                "<h3 style='text-align: center;'>函数控制面板</h3>",
+                "<h3 style='text-align: center;'>函数形态控制面板</h3>",
                 unsafe_allow_html=True
             )
     
             st.markdown('---')
             st.markdown("")
-            create_control_panel_expander = st.expander("DPLS_Lab", expanded=True,)
-    
+            # create_func_control_panel_expander = st.expander("DPLS_Lab", expanded=True)
+
     st.markdown('')
     st.markdown('')
     
@@ -321,7 +116,7 @@ def simplify_data_module(block_id, thread=1):
     
         # 7-5-1 定义内容区 -----------------------------------------------------------------------------------------------
     
-        formular_refresh_col, formular_sep_1, formular_title_add_x, add_x_col, minus_x_col,  formular_sep_2, formular_title_add_xtox, add_xtox_col, minus_xtox_col, formular_sep_3  = st.columns([.6, .3, .75, .21, .21, .3, .75, .21, .21, 3])
+        formular_refresh_col, formular_sep_1, formular_title_add_x, add_x_col, minus_x_col,  formular_sep_2, formular_title_add_xtox, add_xtox_col, minus_xtox_col, formular_sep_3  = st.columns([.6, .3, .75, .21, .21, .3, .75, .21, .21, 2.1])
     
         # with formular_title_col:
         #     render_section_title("你的函数 be like :", underline=False)
@@ -388,10 +183,16 @@ def simplify_data_module(block_id, thread=1):
             minus_xtox = st.button("－", key=f"{block_id}_minus_xtox_b")
             if minus_xtox:
                 st.session_state[f"{block_id}_minus_xtox"] = True
+
+        with formular_sep_3:
+
+            formular_sep_3_col1, formular_sep_3_col2, formular_sep_3_col3 = st.columns([.5, 1, .18])
+            with formular_sep_3_col2:
+                formular_name = st.text_input("存储此函数", placeholder="存储此配置", label_visibility="collapsed", key=f"{block_id}_formular_eg_name")
+            with formular_sep_3_col3:
+                st.button("⏬", key=f"{block_id}_formular_eg_name_button", use_container_width=True)
     
-    
-    
-    with create_control_panel_expander:
+    with create_func_control_panel_expander:
 
     
         create_help_dict = {
@@ -472,7 +273,6 @@ def simplify_data_module(block_id, thread=1):
                                                                step=1, value=st.session_state[f"{block_id}_create_use_x_num"]+1, key=f"{block_id}_create_use_x_num",
                                                                help=create_help_dict.get("create_use_x_num", "无描述"),
                                                                )
-                            print('create_use_x_num + 1')
     
                         elif st.session_state.get(f"{block_id}_minus_x", False) or st.session_state.get(f"{block_id}_minus_xtox", False):
     
@@ -676,7 +476,27 @@ def simplify_data_module(block_id, thread=1):
                     create_xseed = st.number_input("x的随机种子", min_value=0, max_value=20000, step=1, value=409, key=f"{block_id}_create_xseed",
                                                    help="输入x数量后, 每个x会在你给出的定义域上随机抽取n个(每个x抽到的不一样, 即使你只给了一个随机种子), x的随机种子用于决定这个抽取过程"
                                                    )
-    
+
+        with st.expander("", expanded=True):
+
+            create_x_bank = st.multiselect(label="**可出现的f(x):**", options=["All"] + list(function_dict.keys()),
+                                           default=["线性函数", "正弦函数", "二次函数"],
+                                           key=f"{block_id}_create_x_bank",
+                                           help=create_help_dict.get("create_x_bank", "无描述")
+                                           )
+
+            if f"{block_id}_All" in create_x_bank:
+                create_x_bank = list(function_dict.keys())
+
+            if not create_x_bank:
+                create_x_bank = ["正弦函数"]
+
+
+            create_define = st.slider("定义域", -5.0, 5.0, (-1.0, 1.0), key=f"{block_id}_create_define", step=0.1)
+
+            create_define_left = create_define[0]
+            create_define_right = create_define[1]
+
         create_advanced_sets_expander = st.expander("**高级设置**")
     
         with create_advanced_sets_expander:
@@ -727,32 +547,15 @@ def simplify_data_module(block_id, thread=1):
                 create_redun_seed = st.number_input("冗余随机种子", min_value=0, max_value=20000, step=1, value=73, key=f"{block_id}_create_redun_seed",
                                                    help="开启冗余后, 随机种子用于决定冗余的状态"
                                                    )
-    
-            create_x_bank = st.multiselect(label="可出现的f(x):", options=["All"] + list(function_dict.keys()),
-                                           default=["线性函数", "正弦函数", "二次函数"], key=f"{block_id}_create_x_bank",
-                                           help= create_help_dict.get("create_x_bank", "无描述")
-    
-                                           )
-    
-            if f"{block_id}_All" in create_x_bank:
-                create_x_bank = list(function_dict.keys())
-    
-            if not create_x_bank:
-                create_x_bank = ["正弦函数"]
-    
-    
+
+
             create_xtox_bank = st.multiselect(label="可出现的互作函数:", options=["All"] + list(xtox_func_dict.keys()),
-                                              default=["积函数", "绝对值和函数", "正弦和函数"], key=f"{block_id}_create_xtox_bank")
-    
+                                              default=["积函数", "绝对值和函数", "正弦和函数"],
+                                              key=f"{block_id}_create_xtox_bank")
+
             if f"{block_id}_All" in create_xtox_bank:
                 create_xtox_bank = list(xtox_func_dict.keys())
-    
-    
-            create_define = st.slider("定义域", -5.0, 5.0, (-1.0, 1.0), key=f"{block_id}_create_define", step=0.1)
-    
-            create_define_left = create_define[0]
-            create_define_right = create_define[1]
-    
+
             create_thresh_range = st.slider("数据量限制在", 0, 10000, (300, 700), key=f"{block_id}_create_thresh_range", step=100)
     
             create_linear_limit_col, only_usedx_col = st.columns([2, 1])
@@ -765,12 +568,10 @@ def simplify_data_module(block_id, thread=1):
     
                 use_x_piked = st.checkbox("排除无关特征", key=f"{block_id}_use_x_piked", value=True)
     
-        check_file_button = st.button("**检视**", use_container_width=True, icon="🔍", key=f"{block_id}_check_file_button")
-    
-        hr_second(dark_color="#244690", height=2.5, light_color="#26519d")
-    
+
         # 7-3 收集参数 ---------------------------------------------------------------------------------------------------
-    
+
+
         # 传给 gen_y_exp 的参数
         create_kwargs = {
     
@@ -841,11 +642,12 @@ def simplify_data_module(block_id, thread=1):
     
                 else:
                     print('eg_not_changed')
+
                     x_eg = st.session_state[f'{block_id}_x_eg']
                     X_eg = st.session_state[f'{block_id}_X_eg']
                     y_exp_eg = st.session_state[f'{block_id}_y_exp_eg']
                     x_picked_eg = st.session_state[f'{block_id}_x_picked_eg']
-    
+
     
             # 7-5-3 生成 eg ---------------------------------------------------------------------------------------------
     
@@ -860,7 +662,7 @@ def simplify_data_module(block_id, thread=1):
     
             x_eg_columns = x_eg.columns.tolist()
     
-        formula_eg = 'y=' + '+'.join(list(X_eg.columns))
+        formular_eg = 'y=' + '+'.join(list(X_eg.columns))
     
         st.markdown("")
         st.markdown("")
@@ -871,24 +673,35 @@ def simplify_data_module(block_id, thread=1):
         st.markdown('')
         st.markdown('')
         st.markdown('')
-        st.markdown("")
-    
-    
+        st.markdown('')
+        st.markdown('')
+        st.markdown('')
+        st.markdown('')
+        st.markdown('')
+
+
+
         # 7-5-4 打印公式的latex格式 ---------------------------------------------------------------------------------------
     
-        latex_expr = apply_colored_brackets(formula_eg)
+        latex_expr = apply_colored_brackets(formular_eg)
         st.latex(latex_expr)
+
+        st.markdown('')
+        st.markdown('')
+        st.markdown('')
+        st.markdown('')
+        st.markdown('')
+        st.markdown('')
+        st.markdown('')
+        st.markdown('')
+        st.markdown('')
+        st.markdown('')
         st.markdown('')
         st.markdown("")
-        st.markdown('')
-        st.markdown('')
-        st.markdown('')
-        st.markdown('')
-        st.markdown("")
         st.markdown("")
         st.markdown("")
         st.markdown('')
-        st.markdown("<div style='height:28px'></div>", unsafe_allow_html=True)
+        st.markdown("<div style='height:27px'></div>", unsafe_allow_html=True)
         hr_second(dark_color="#244690", height=2.5, light_color="#26519d")
     
     # 独立与互作特征鉴别器(待升级)
@@ -901,28 +714,36 @@ def simplify_data_module(block_id, thread=1):
     
     
     # 读取颜色（默认浅色）
-    
-    with create_control_panel_expander:
-    
+
+
+    with create_output_control_panel_:
+
+        hr_second(dark_color="#244690", height=2.5, light_color="#26519d")
+
         formula_panel1_col1, formula_panel1_col2 = st.columns([.5, .5])
+
+        with formula_panel1_col1:
+
+            st.markdown("")
+            st.markdown("")
+            st.markdown(
+                "<h3 style='text-align: center;'>数据推送</h3>",
+                unsafe_allow_html=True
+            )
+            st.markdown("---")
+
+        with formula_panel1_col2:
+
+            st.markdown("")
+            st.markdown("")
+            st.markdown(
+                "<h3 style='text-align: center;'>预览区 DPLS 控制</h3>",
+                unsafe_allow_html=True
+            )
+            st.markdown("---")
+
     
         with formula_panel1_col2:
-    
-            create_method_expander = st.expander("选择分析的方法", expanded=True)
-    
-            with create_method_expander:
-    
-                # 4-3 选择方法
-                create_method_selection = st.selectbox(
-                    label="分析方法（可多选）", key=f"{block_id}_create_method_selection",
-                    options="DPLSR", label_visibility="collapsed",
-                )
-    
-                # 4-4 方法的打印内容
-                if create_method_selection:
-                    method_print = {m + 1: method_ for m, method_ in enumerate(create_method_selection)}
-                else:
-                    method_print = {}
     
             # 使用 expander 创建一个可折叠/展开的区域
             DPLSR_param_dict_ = DPLSR_param_dict.copy()
@@ -939,34 +760,14 @@ def simplify_data_module(block_id, thread=1):
 
         with formula_panel1_col1:
 
-            create_exe_expander_2 = st.expander(f"**输出**", expanded=True)
+            create_exe_expander_2 = st.expander(f"**推送**", expanded=True)
     
             # 7-5-6-1 打印模拟样本的生成参数  -------------------------------------------------------------------------------
     
             with create_exe_expander_2:
-                st.markdown("")
-                st.markdown("")
+
+
                 st.markdown("---")
-
-                direction_panel = st.columns([1, 1])
-
-                direction_transform = {
-
-                    "X - y":"AB",
-                    "y - X":"BA",
-                    "X - y&y - X":"AB&BA"
-
-                }
-
-                # 文件方向
-                with direction_panel[0]:
-                    file_direction = st.selectbox("样本方向", ["X - y", "y - X", "X - y&y - X"], key=f"{block_id}_file_direction")
-                    file_direction = direction_transform[file_direction]
-
-                # 分析方向
-                with direction_panel[1]:
-                    analys_direction = st.selectbox("属性方向", ["X - y", "y - X", "X - y&y - X"], key=f"{block_id}_analys_direction")
-                    analys_direction = direction_transform[analys_direction]
 
                 col_file_num, col_test_seed = st.columns([1, 1])
     
@@ -980,7 +781,7 @@ def simplify_data_module(block_id, thread=1):
                         , key=f"{block_id}_test_files_num")
     
                     illegal_compatible_mode = st.selectbox("非法样本兼容", [True, False], key=f"{block_id}_illegal_compatible_mode")
-    
+
                 with col_test_seed:
                     seed_value = st.number_input(
                         "类似函数抽样种子",
@@ -989,6 +790,9 @@ def simplify_data_module(block_id, thread=1):
                         value=42,
                         step=1
                         , key=f"{block_id}_seed_value")
+
+
+                    print(f"in sym-{block_id}_seed_value", seed_value )
 
                     if st.session_state.get(f"{block_id}_gen_floor", False):
 
@@ -1020,8 +824,8 @@ def simplify_data_module(block_id, thread=1):
                             value=1,
                             step=1
                             , key=f"{block_id}_gen_floor")
-    
 
+                st.markdown("---")
 
                 create_noise = st.slider("y_obs 噪音强度域", min_value=0.0, max_value=5.0, step=0.05, value=(0.05, 0.5),
                                          key=f"{block_id}_create_noise",
@@ -1030,28 +834,32 @@ def simplify_data_module(block_id, thread=1):
 
                 thresh_range = st.slider("样本数限制在", 0, 10000, (100, 1500), key=f"{block_id}_thresh_range", step=100)
 
+                st.markdown("<div style='height:41px'></div>", unsafe_allow_html=True)
 
-                create_output_col = st.columns([1,1])
+                output_create_button = st.button("**推送到项目**", use_container_width=True, key=f"{block_id}_output_create_button")
 
-                with create_output_col[0]:
-                    output_create_button = st.button("**输出**", use_container_width=True, key=f"{block_id}_output_create_button")
 
-            DPLS_attr_dict = DPLS().__dict__.copy()
-            DPLS_needed_param = ["cv", "max_iter", "R2", "cv_R2", "fit_R2", "p", "cv_p", "fit_p", "y_pred_R2", "square"]
-            DPLS_attr_dict = {k: v for k, v in DPLS_attr_dict.items() if k in DPLS_needed_param}
-    
-            with st.expander("**选择需要的 DPLS 属性**", expanded=True):
+            # DPLS_attr_dict = DPLS().__dict__.copy()
+            # DPLS_needed_param = ["cv", "max_iter", "R2", "cv_R2", "fit_R2", "p", "cv_p", "fit_p", "y_pred_R2", "square"]
+            # DPLS_attr_dict = {k: v for k, v in DPLS_attr_dict.items() if k in DPLS_needed_param}
+            #
+            # with st.expander("**选择需要的 DPLS 属性**", expanded=True):
+            #
+            #     analys_direction = st.selectbox("属性方向", ["X - y", "y - X", "X - y&y - X"],
+            #                                     key=f"{block_id}_analys_direction")
+            #     analys_direction = direction_transform[analys_direction]
+            #
+            #     DPLS_attr_col = st.columns([1.32, 1])
+            #
+            #     DPLS_picked_attr = {}
+            #
+            #     for idx, key in enumerate(DPLS_attr_dict.keys()):
+            #
+            #         with DPLS_attr_col[idx % 2]:
+            #             DPLS_picked_attr[key] = st.checkbox(f"{key}", value=False, key=f"{block_id}_DPLS_needed_attr_{key}")
+            #
+            # DPLS_picked_attr = {key:value for key, value in DPLS_picked_attr.items() if value}
 
-                DPLS_attr_col = st.columns([1.32, 1])
-    
-                DPLS_picked_attr = {}
-    
-                for idx, key in enumerate(DPLS_attr_dict.keys()):
-    
-                    with DPLS_attr_col[idx % 2]:
-                        DPLS_picked_attr[key] = st.checkbox(f"{key}", value=False, key=f"{block_id}_DPLS_needed_attr_{key}")
-
-            DPLS_picked_attr = {key:value for key, value in DPLS_picked_attr.items() if value}
 
     with create_preview_panel:
         st.markdown('')
@@ -1061,8 +869,8 @@ def simplify_data_module(block_id, thread=1):
         st.markdown("")
     
     
-        plot_sep_0, plot_P_col, plot_sep_1,plot_addnoise_col, plot_sep_4, plot_y_exp_col, plot_sep_2, plot_y_obs_col, plot_sep_3, plot_download_col = st.columns(
-            [.01, 1.3,.2,1.3,.2,.5,.2, .5, 2.9, .3])
+        plot_sep_0, plot_P_col, plot_sep_1,plot_addnoise_col, plot_sep_4, plot_y_exp_col, plot_sep_2, plot_y_obs_col, plot_sep_3, plot_DPLSR_col, plot_PrsR_col = st.columns(
+            [.01, 1.3,.2,1.3,.2,.5,.2, .5, 1.2, 1.05, .9])
     
     
         with plot_P_col:
@@ -1100,6 +908,8 @@ def simplify_data_module(block_id, thread=1):
         st.markdown("")
         st.markdown("")
         st.markdown('')
+        st.markdown("")
+        st.markdown('')
     
         with st.spinner("正在拟合..."):
 
@@ -1125,6 +935,71 @@ def simplify_data_module(block_id, thread=1):
                     pred_obj = st.session_state[f'{block_id}_pred_obj']
 
             st.session_state[f'{block_id}_eg_created'] = True
+
+        with plot_sep_3:
+
+            if DPLS_kwargs["DPLSR"]["R_mode"] == 'single':
+                pass
+            else:
+
+                st.markdown("<div style='height:0px'></div>", unsafe_allow_html=True)
+                st.markdown(
+                    f"""
+                    <h3 style='text-align: right; font-size: 28px; font-weight: bold;'>
+                        P: 
+                        <span style='color: #3580f5; font-size: 30px; font-weight: bold;'>
+                            {pred_obj.p[0] if enforce_P == -1 else enforce_P}
+                        </span>
+                    </h3>
+                    """,
+                    unsafe_allow_html=True
+                )
+
+        with plot_DPLSR_col:
+
+            if DPLS_kwargs["DPLSR"]["R_mode"] == 'single':
+                pass
+            else:
+                st.markdown("<div style='height:0px'></div>", unsafe_allow_html=True)
+                st.markdown(
+                    f"""
+                    <h3 style='text-align: right; font-size: 28px; font-weight: bold;'>
+                        DPLSR: 
+                        <span style='color: #3580f5; font-size: 30px; font-weight: bold;'>
+                            {pred_obj.R2[0] if enforce_P == -1 else pred_obj.y_pred_R2[0][enforce_P] :.2f}
+                        </span>
+                    </h3>
+                    """,
+                    unsafe_allow_html=True
+                )
+            with plot_PrsR_col:
+
+                if DPLS_kwargs["DPLSR"]["R_mode"] == 'single':
+                    st.markdown("<div style='height:0px'></div>", unsafe_allow_html=True)
+                    st.markdown(
+                        f"""
+                        <h3 style='text-align: right; font-size: 28px; font-weight: bold;'>
+                            Single Mode 
+                        </h3>
+                        """,
+                        unsafe_allow_html=True
+                    )
+                else:
+                    st.markdown("<div style='height:0px'></div>", unsafe_allow_html=True)
+                    st.markdown(
+                        f"""
+                        <h3 style='text-align: right; font-size: 28px; font-weight: bold;'>
+                            PrsR: 
+                            <span style='color: #3580f5; font-size: 30px; font-weight: bold;'>
+                                {calculate_corr(y_exp_eg, y_obs_eg)[0]:.2f}
+                            </span>
+                        </h3>
+                        """,
+                        unsafe_allow_html=True
+                    )
+
+
+
 
         # 定义两列
         cols = st.columns(2)
@@ -1164,7 +1039,7 @@ def simplify_data_module(block_id, thread=1):
                     R = pred_obj.y_pred_R2[0][enforce_P]
     
                 P = enforce_P
-    
+
             x_eg_use_i = pd.DataFrame()
             x_eg_use_i[x_i] = pred_obj.X.copy()[:, x]
     
@@ -1250,29 +1125,30 @@ def simplify_data_module(block_id, thread=1):
                 st.plotly_chart(fig, use_container_width=True, key=f"{block_id}_{x_i}create_plotly_chart")
     
             fig_dict[f"plots_{x_i}"] = fig
-    
+
+
     create_check_file_sep, create_check_file_col = st.columns([0.001, 1])
     
     with create_check_file_col:
-    
+
         create_check_file_expander = st.expander("检视预览函数样本", expanded=False)
 
         with create_check_file_expander:
             formula_x_col, formula_check_file_sep, formula_y_col = st.columns([.738, 0.025, .382])
-    
+
             with formula_x_col:
                 st.markdown("")
                 st.markdown("")
                 render_section_title("来自函数的自变量:")
-    
+
                 with st.expander(f"**{x_eg.shape}**", expanded=True):
                     st.markdown("---")
                     st.dataframe(x_eg_use.copy(), height=795, hide_index=True)
-    
+
             with formula_y_col:
                 st.markdown("")
                 st.markdown("")
-    
+
                 render_section_title("因变量")
                 with st.expander(f"**{y_df_eg.shape}** | PersonR^2 = {calculate_corr(y_exp_eg, y_obs_eg)[0]:.3f}",
                                  expanded=True):
@@ -1284,7 +1160,9 @@ def simplify_data_module(block_id, thread=1):
         total_1 = 0
         total_file = 0
 
-        if check_file_button or output_create_button:
+        if output_create_button and not(eg_change or dpls_change):
+
+            print("run_created")
 
             with st.spinner('正在生模拟数据...'):
 
@@ -1327,13 +1205,13 @@ def simplify_data_module(block_id, thread=1):
                         create_i_use = x_create.copy()
 
                     create_i_use["y"] = y_obs_create
-                    created_data_pair, created_pair_name, created_data_cause = return_cause_pair(create_i_use,
-                                                                                                 relation=file_direction,
-                                                                                                 prefix=f'[{create_func_name}]')
+                    created_data_pair, created_pair_name, created_data_cause = return_cause_pair(create_i_use, prefix=f'[{create_func_name}]')
 
                     created_data[create_func_name] = {"files_pair": dict(zip(created_pair_name, created_data_pair)),
                                                       "files_cause": dict(zip(created_pair_name, created_data_cause)),
-                                                      "R_true": dict(zip(created_pair_name, [create_R_true]*len(created_pair_name))),}
+                                                      "R_true": dict(zip(created_pair_name, [create_R_true]*len(created_pair_name))),
+                                                      "X_name":dict(zip(created_pair_name, x_picked_create)),
+                                                      'description':'y=' + '+'.join(list(X_create)),}
 
                     count_0 = created_data_cause.count(0)
                     count_1 = created_data_cause.count(1)
@@ -1345,85 +1223,92 @@ def simplify_data_module(block_id, thread=1):
             # 7-4-2 模拟数据存入全局变量: use_files_dict -----------------------------------------------------------------------
 
             use_files_dict = created_data.copy()
+            st.session_state[f'{block_id}_use_files_dict'] = use_files_dict
 
-            # 传给 detail_panel 的参数
-            file_param = {
-                "正在分析": "模拟样本",
-                "非法样本兼容": illegal_compatible_mode,
-                '样本方向': file_direction,
-                '分析方向': analys_direction,
-                '文件抽样数': test_files_num,
-                '文件抽样种子': seed_value,
-                '样本量': thresh_range,
-                "开启冗余": f"是" if create_redun else "否",
-                "仅生成线性样本": create_linear_limit,
-            }
+            with create_exe_expander_2:
+
+                st.success(f'已推送 {len(use_files_dict)} 个函数到项目')
 
             # 7-5-5 打印样本的 X 与 y -----------------------------------------------------------------------------------------
 
             # 7-5-6 打印模拟样本的生成参数 与 参数符合度的检测结果 ------------------------------------------------------------------
 
-        if output_create_button:
-
-            all_files_dpls_values = []
-
-            for db_name, db_values in stqdm(use_files_dict.items()):
-
-                DPLS_obj_dict:dict = parallel_wrapper(cal_DPLS_obj, db_values["files_pair"], desc="cal_DPLS_obj", reason=0, result=1, thread=thread)
-                db_values['files_dpls_obj'] = DPLS_obj_dict
-                db_values['files_dpls_values'] = {key: {pick: dpls_obj.__dict__[pick] for pick in DPLS_picked_attr.keys()} for key, dpls_obj in db_values['files_dpls_obj'].items()}
-
-                db_files_dpls_values = pd.DataFrame.from_dict(db_values['files_dpls_values'], orient='index')
-
-                if "R2" in db_files_dpls_values.columns:
-
-                    R2_expanded = db_files_dpls_values['R2'].apply(lambda x: x[0])
-                    db_files_dpls_values = pd.concat([db_files_dpls_values.drop(columns=["R2"]), R2_expanded], axis=1)
-
-                if "p" in db_files_dpls_values.columns:
-
-                    p_expanded = db_files_dpls_values['p'].apply(lambda x: x[0])
-                    db_files_dpls_values = pd.concat([db_files_dpls_values.drop(columns=['p']), p_expanded], axis=1)
-
-                if 'y_pred_R2' in db_files_dpls_values.columns:
-                    y_pred_R2_expanded = db_files_dpls_values['y_pred_R2'].apply(lambda x: x[0])
-                    y_pred_R2_expanded =  y_pred_R2_expanded.apply(pd.Series)
-                    y_pred_R2_expanded.columns = [f"r2_p{i}" for i in range(y_pred_R2_expanded.shape[1])]
-                    db_files_dpls_values = pd.concat([db_files_dpls_values.drop(columns=["y_pred_R2"]), y_pred_R2_expanded], axis=1)
-
-                db_files_dpls_values["R_true"] = pd.Series(db_values["R_true"])
-
-                db_values['files_dpls_values'] = db_files_dpls_values
-                all_files_dpls_values.append(db_files_dpls_values)
-
-            all_files_dpls_values = pd.concat(all_files_dpls_values, axis=0)
-            st.dataframe(all_files_dpls_values)
-
-            with create_output_col[1]:
-
-                csv = all_files_dpls_values.to_csv().encode('utf-8')
-                # 添加下载按钮
-                download_create_button = st.download_button(
-                    label="📥 下载",
-                    data=csv,
-                    file_name=f'create_{test_files_num}_data.csv',
-                    mime='text/csv',
-                    use_container_width=True, key=f"{block_id}_download_create_button"
-                )
-
-        if check_file_button:
-
-            st.markdown("")
-            st.markdown("")
-            st.markdown("<h3 style='text-align: center;'>文件检视面板</h3>", unsafe_allow_html=True)
-            st.markdown("")
-            st.markdown("---")
-
-            expand_raw_now_files(use_files_dict, total_0=total_0, total_1=total_1, total_file=total_file, expand=False, print_pred=True, thread=thread)
-
+        # if output_create_button:
+        #
+        #     if DPLS_picked_attr:
+        #
+        #         all_files_dpls_values = []
+        #
+        #         for db_name, db_values in stqdm(use_files_dict.items()):
+        #
+        #             DPLS_obj_dict:dict = parallel_wrapper(cal_DPLS_obj, db_values["files_pair"], desc="cal_DPLS_obj", reason=0, result=1, thread=thread)
+        #             db_values['files_dpls_obj'] = DPLS_obj_dict
+        #             db_values['files_dpls_values'] = {key: {pick: dpls_obj.__dict__[pick] for pick in DPLS_picked_attr.keys()} for key, dpls_obj in db_values['files_dpls_obj'].items()}
+        #
+        #             db_files_dpls_values = pd.DataFrame.from_dict(db_values['files_dpls_values'], orient='index')
+        #
+        #             if "R2" in db_files_dpls_values.columns:
+        #
+        #                 R2_expanded = db_files_dpls_values['R2'].apply(lambda x: x[0])
+        #                 db_files_dpls_values = pd.concat([db_files_dpls_values.drop(columns=["R2"]), R2_expanded], axis=1)
+        #
+        #             if "p" in db_files_dpls_values.columns:
+        #
+        #                 p_expanded = db_files_dpls_values['p'].apply(lambda x: x[0])
+        #                 db_files_dpls_values = pd.concat([db_files_dpls_values.drop(columns=['p']), p_expanded], axis=1)
+        #
+        #             if 'y_pred_R2' in db_files_dpls_values.columns:
+        #                 y_pred_R2_expanded = db_files_dpls_values['y_pred_R2'].apply(lambda x: x[0])
+        #                 y_pred_R2_expanded =  y_pred_R2_expanded.apply(pd.Series)
+        #                 y_pred_R2_expanded.columns = [f"r2_p{i}" for i in range(y_pred_R2_expanded.shape[1])]
+        #                 db_files_dpls_values = pd.concat([db_files_dpls_values.drop(columns=["y_pred_R2"]), y_pred_R2_expanded], axis=1)
+        #
+        #             db_files_dpls_values["R_true"] = pd.Series(db_values["R_true"])
+        #
+        #             db_values['files_dpls_values'] = db_files_dpls_values
+        #             all_files_dpls_values.append(db_files_dpls_values)
+        #
+        #         all_files_dpls_values = pd.concat(all_files_dpls_values, axis=0)
+        #         st.dataframe(all_files_dpls_values)
+        #
+        #         csv = all_files_dpls_values.to_csv().encode('utf-8')
+        #         # 添加下载按钮
+        #         download_create_button = st.download_button(
+        #             label="📥 下载",
+        #             data=csv,
+        #             file_name=f'create_{test_files_num}_data.csv',
+        #             mime='text/csv',
+        #             use_container_width=True, key=f"{block_id}_download_create_button"
+        #         )
+        #
+        #     else:
+        #         pass
+        # if check_file_button or use_files_dict:
+        #
+        #     st.markdown("")
+        #     st.markdown("")
+        #     st.markdown("<h3 style='text-align: center;'>文件检视面板</h3>", unsafe_allow_html=True)
+        #     st.markdown("")
+        #     st.markdown("---")
+        #
+        #     expand_raw_now_files(use_files_dict, total_file=total_file, expand=True, print_pred=True, thread=thread)
 
     hr_second(dark_color="#244690", height=2.5, light_color="#26519d")
-    
+
+    file_param = {
+
+        "illegal_compatible_mode": illegal_compatible_mode,
+        'test_files_num': test_files_num,
+        'seed_value': seed_value,
+        'thresh_range': thresh_range,
+        "create_redun": create_redun,
+        "create_linear_limit": create_linear_limit,
+        "gen_floor": gen_floor
+
+    }
+
+    return use_files_dict, file_param
+
     # with plot_download_col:
     #     with st.spinner(""):
     #

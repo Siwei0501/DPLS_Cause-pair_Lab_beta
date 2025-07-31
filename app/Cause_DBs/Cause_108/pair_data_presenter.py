@@ -88,7 +88,7 @@ def return_cause_pair(relation: Literal['AB', 'BA', 'AB&BA'], threshold: list, t
 
         read_in_files = [pd.read_csv(os.path.join(folder_path, file), sep='\s+', header=None, dtype=float) for file in
                          selected_files]
-        file_names = [relation_ + name_[:-4] for name_ in selected_files]
+        file_names = [relation_ + "_" + name_[:-4] for name_ in selected_files]
 
         sampled_files.extend(read_in_files)
         sampled_files_name.extend(file_names)

@@ -21,7 +21,7 @@ Pre_process_Option = Literal[
 Pre_process_Iterable = Union[Pre_process_Option, Iterable[Pre_process_Option]]
 
 Method_Option = Literal[
-    'DPLSR', 'P_DPLSR', 'MIDC', 'DPLSe_KCI', 'DPLSe_P_KCI', 'DPLSe_HSIC',
+    'DPLSR','DPLS', 'P_DPLSR', 'MIDC', 'DPLSe_KCI', 'DPLSe_P_KCI', 'DPLSe_HSIC',
     'PATH', 'Sum', 'PersonR', 'is_Linear', 'GS', '','CV', "Sort_by_reason",
     'DPLS_predR', 'break_DPLSR', 'CMVe_DPLSR', 'aCMV_DPLSe_KCI', 'chain_stability', 'CMVe_DPLSe_KCI', 'PATH_tender', 'shuffle_path']
 
@@ -98,6 +98,41 @@ def cal_DPLSR(file_value: pd.DataFrame, **kwargs):
 
     DPLS_obj = DPLS(**kwargs).fit(value_copy[[kwargs['reason']]], value_copy[[kwargs['result']]], **kwargs)
     return DPLS_obj.R2[0], DPLS_obj.p[0]
+
+def cal_DPLS_obj(file_value:pd.DataFrame, **kwargs):
+
+    value_copy = file_value.copy()
+
+    DPLS_needed_param = ["_max_iter_", "_R2_", "_cv_R2_", "_fit_R2_", "_p_", "_cv_p_", "_fit_p_", "_y_pred_R2_", ]
+    piked_DPLS_params = []
+
+
+    for param in DPLS_needed_param:
+
+        if kwargs.get(param, False):
+
+            piked_DPLS_params.append(param[1:-1])
+
+    if not piked_DPLS_params:
+
+        piked_DPLS_params = ["R2"]
+
+
+    DPLS_obj = DPLS(**kwargs).fit(value_copy[[kwargs['reason']]], value_copy[[kwargs['result']]], **kwargs)
+
+    needed_param = []
+
+    for param in piked_DPLS_params:
+
+        if param == 'y_pred_R2':
+
+            needed_param.extend(DPLS_obj.__dict__['y_pred_R2'][0])
+
+        else:
+            needed_param.extend(DPLS_obj.__dict__[param])
+
+
+    return needed_param
 
 
 def cal_PersonR(file_value: pd.DataFrame, R2=True, **kwargs):
@@ -915,7 +950,54 @@ algorithms = {'DPLSR': cal_DPLSR,
               }
 
 def return_name(method, reverse=False, **kwargs) -> list[str]:
-    if method == 'DPLSR':
+
+    if method == 'DPLS':
+
+        DPLS_needed_param = ["_max_iter_", "_R2_", "_cv_R2_", "_fit_R2_", "_p_", "_cv_p_", "_fit_p_", "_y_pred_R2_", ]
+        piked_DPLS_params = []
+
+        for param in DPLS_needed_param:
+
+            if kwargs.get(param, False):
+                piked_DPLS_params.append(param[1:-1])
+
+        if not piked_DPLS_params:
+            piked_DPLS_params = ["R2"]
+
+        if reverse:
+
+            tail_char = f"(B, A)"
+
+        else:
+
+            tail_char = f"(A, B)"
+
+        pre_char = f"{kwargs['pre_process']}"
+
+        col_name = []
+
+        for value in piked_DPLS_params:
+
+            if value == 'y_pred_R2':
+
+                if 'max_iter' in kwargs:
+
+                    max_iter = kwargs['max_iter']
+
+                else:
+
+                    max_iter = 20
+
+                col_name.extend([f"DPLS_{pre_char}_P{p}-R2_{tail_char}" for p in range(max_iter)])
+
+            else:
+
+                col_name.append(f"DPLS_{pre_char}_{value}{tail_char}")
+
+        return col_name
+
+
+    elif method == 'DPLSR':
 
         if reverse:
             col_name = [f"DPLS_R2{kwargs['pre_process']}(B, A)", f"P{kwargs['pre_process']}(B, A)"]

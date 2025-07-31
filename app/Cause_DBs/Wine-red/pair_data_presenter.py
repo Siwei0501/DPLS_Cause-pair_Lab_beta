@@ -39,7 +39,7 @@ def return_cause_pair(relation: Literal["AB", "BA", "AB&BA"] = "AB", **kwargs):
             data_in_pair_format.append(pair)
 
         pair_data.extend(data_in_pair_format)
-        pair_name.extend([relation_ + f"[{str(col_name)}]" for col_name in airfoil_file.columns[:-1]])
+        pair_name.extend([relation_ + "_" + f"[{str(col_name)}]" for col_name in airfoil_file.columns[:-1]])
 
         if relation_ == "AB":
 

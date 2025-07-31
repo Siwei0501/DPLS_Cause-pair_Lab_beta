@@ -20,7 +20,7 @@ Pre_process_Option = Literal[
 Pre_process_Iterable = Union[Pre_process_Option, Iterable[Pre_process_Option]]
 
 Method_Option = Literal[
-    'DPLSR', 'P_DPLSR', 'MIDC', 'DPLSe_KCI', 'DPLSe_P_KCI', 'DPLSe_HSIC',
+    'DPLSR', 'DPLS', 'P_DPLSR', 'MIDC', 'DPLSe_KCI', 'DPLSe_P_KCI', 'DPLSe_HSIC',
     'PATH', 'Sum', 'PersonR', 'is_Linear', 'GS', '','CV', "Sort_by_reason",
     'DPLS_predR', 'break_DPLSR', 'CMVe_DPLSR', 'aCMV_DPLSe_KCI', 'chain_stability', 'CMVe_DPLSe_KCI', 'PATH_tender', 'shuffle_path']
 
@@ -92,32 +92,49 @@ def col_mean(data: pd.DataFrame, host_col, guest_col):
     return host
 
 
-def cal_DPLSR(file_value:pd.DataFrame, need_P:bool=False, need_Rs:bool=False, **kwargs):
+def cal_DPLSR(file_value:pd.DataFrame, **kwargs):
 
     value_copy = file_value.copy()
 
-    if "max_iter" in kwargs:
+    DPLS_obj = DPLS(**kwargs).fit(value_copy[[kwargs['reason']]], value_copy[[kwargs['result']]], **kwargs)
 
-        max_iter = kwargs["max_iter"]
+    return DPLS_obj.R2[0], DPLS_obj.p[0]
 
-    else:
 
-        max_iter = 20
+def cal_DPLS_obj(file_value:pd.DataFrame, **kwargs):
+
+    value_copy = file_value.copy()
+
+    DPLS_needed_param = ["_max_iter_", "_R2_", "_cv_R2_", "_fit_R2_", "_p_", "_cv_p_", "_fit_p_", "_y_pred_R2_", ]
+    piked_DPLS_params = []
+
+
+    for param in DPLS_needed_param:
+
+        if kwargs.get(param, False):
+
+            piked_DPLS_params.append(param[1:-1])
+
+    if not piked_DPLS_params:
+
+        piked_DPLS_params = ["R2"]
+
 
     DPLS_obj = DPLS(**kwargs).fit(value_copy[[kwargs['reason']]], value_copy[[kwargs['result']]], **kwargs)
 
-    DPLS_return = [DPLS_obj.R2[0]]
+    needed_param = []
 
-    if need_P:
+    for param in piked_DPLS_params:
 
-        DPLS_return.append(DPLS_obj.p[0])
+        if param == 'y_pred_R2':
 
-    if need_Rs:
+            needed_param.extend(DPLS_obj.__dict__['y_pred_R2'][0])
 
-        for p in range(max_iter):
-            DPLS_return.append(DPLS_obj.y_pred_R2[0][p])
+        else:
+            needed_param.extend(DPLS_obj.__dict__[param])
 
-    return DPLS_return
+
+    return needed_param
 
 
 def cal_PersonR(file_value:pd.DataFrame,R2=True,  **kwargs):
@@ -358,7 +375,6 @@ def cal_X_e_KCI(DPLS_obj: DPLS, P: None | int = None, **kwargs):
     X_shape1 = DPLS_obj.X.shape[1]
     X_e_KCI_obj = CIT(X_e, method='kci')
     X_e_KCI_value = X_e_KCI_obj(1, range(X_shape1))
-    print(X_e_KCI_value)
 
     return X_e_KCI_value  # KCI(y, x, cmv)
 
@@ -926,7 +942,8 @@ process = {
             "Sort_by_reason":Sort_by_reason,
            }
 
-algorithms = {'DPLSR': cal_DPLSR,
+algorithms = {'DPLS': cal_DPLS_obj,
+              'DPLSR':cal_DPLSR,
               'PATH': cal_path,
               'PersonR': cal_PersonR,
               'CV': cal_CV,
@@ -957,17 +974,18 @@ algorithms = {'DPLSR': cal_DPLSR,
 
 def return_name(method, reverse=False, **kwargs) -> list[str]:
 
-    if method == 'DPLSR':
+    if method == 'DPLS':
 
-        if "max_iter" in kwargs:
+        DPLS_needed_param = ["_max_iter_", "_R2_", "_cv_R2_", "_fit_R2_", "_p_", "_cv_p_", "_fit_p_", "_y_pred_R2_", ]
+        piked_DPLS_params = []
 
-            max_iter = kwargs["max_iter"]
+        for param in DPLS_needed_param:
 
-        else:
+            if kwargs.get(param, False):
+                piked_DPLS_params.append(param[1:-1])
 
-            max_iter = 20
-
-        pre_char = f"{kwargs['pre_process']}"
+        if not piked_DPLS_params:
+            piked_DPLS_params = ["R2"]
 
         if reverse:
 
@@ -977,23 +995,38 @@ def return_name(method, reverse=False, **kwargs) -> list[str]:
 
             tail_char = f"(A, B)"
 
-        col_name = [f"DPLS_R2{pre_char}{tail_char}"]
+        pre_char = f"{kwargs['pre_process']}"
 
-        if 'need_P' in kwargs:
+        col_name = []
 
-            if kwargs['need_P']:
+        for value in piked_DPLS_params:
 
-                col_name.append(f"DPLS_P{pre_char}{tail_char}")
+            if value == 'y_pred_R2':
 
-        if 'need_Rs' in kwargs:
+                if 'max_iter' in kwargs:
 
-            if kwargs['need_Rs']:
+                    max_iter = kwargs['max_iter']
 
-                for p in range(max_iter):
+                else:
 
-                    col_name.append(f"P_{p}{tail_char}")
+                    max_iter = 20
+
+                col_name.extend([f"DPLS_{pre_char}_P{p}-R2_{tail_char}" for p in range(max_iter)])
+
+            else:
+
+                col_name.append(f"DPLS_{pre_char}_{value}{tail_char}")
 
         return col_name
+
+
+    elif method == 'DPLSR':
+
+        if reverse:
+            col_name = [f"DPLS_R2{kwargs['pre_process']}(B, A)", f"P{kwargs['pre_process']}(B, A)"]
+        else:
+            col_name = [f"DPLS_R2{kwargs['pre_process']}(A, B)", f"P{kwargs['pre_process']}(A, B)"]
+
 
     elif method == 'P_DPLSR':
 

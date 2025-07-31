@@ -5,6 +5,7 @@ from typing import Tuple
 
 import numpy as np
 import pandas as pd
+from custom_html_module import *
 
 
 def gen_x(sample_num:int=500, param_num:int=2, x_start=-1, x_end=1, x_mode:Literal['uniform', 'grow', 'parabola']='uniform', x_seed=None, **kwargs) -> pd.DataFrame:
@@ -173,27 +174,6 @@ def x_function(x: pd.DataFrame, use_x_num:int, x_num:int, func_seed:int, linear:
     linear_coef = random.uniform(*linear_coef_range)
     linear_intercept = random.uniform(*linear_intercept_range)
 
-    function_dict = {
-        "线性函数":lambda f: linear_coef * f + linear_intercept,
-        "正弦函数": lambda f: np.sin(np.pi*f),
-        "余弦函数": lambda f: np.cos(np.pi * f),
-        "二次函数": lambda f: 2 * (f ** 2),
-        "平方根函数": lambda f: np.sqrt(np.abs(f)),
-        "指数函数": lambda f: np.exp(f),
-        "对数函数（平移）": lambda f: np.log(f + 1),
-        "对数函数（加偏移防负值）": lambda f: np.log(np.abs(f) + 1e-10),
-        "Sigmoid 函数": lambda f: 1 / (1 + np.exp(-6 * f)),
-        "三次多项式函数": lambda f: 2 * (f ** 3) + f ** 2 - 2 * f,
-        "指数幂函数": lambda f: 2 ** (5 * (f + 1)),
-        "高频正弦函数": lambda f: np.sin(6 * np.pi * f),
-        "混合三角+线性函数": lambda f: 0.2 * np.sin(4 * f) + (11 / 10) * f,
-        "高频正弦 + 线性项": lambda f: np.sin(5 * np.pi * f) + f,
-        "高频余弦函数": lambda f: np.cos(6 * np.pi * f),
-        "高频正弦线性混合函数": lambda f: (1 / 10) * np.sin(10.6 * f) + (11 / 10) * f,
-        "非线性频率余弦函数": lambda f: np.cos(6 * np.pi * f * (f + 1)),
-        "非线性频率正弦函数": lambda f: np.sin(6 * np.pi * f * (f + 1)),
-    }
-
     if use_x_func is None:
 
         use_x_func = ["正弦函数", "余弦函数", "二次函数", "平方根函数"]
@@ -211,7 +191,6 @@ def x_function(x: pd.DataFrame, use_x_num:int, x_num:int, func_seed:int, linear:
     def select_func():
         # 定义函数列表及其对应的字符串表示
 
-
         functions_formula = {
             "线性函数": f'(({linear_coef:.2f}){x_mark}＋({linear_intercept:.2f}))',
             "正弦函数": f'sin(π{x_mark})',
@@ -223,8 +202,8 @@ def x_function(x: pd.DataFrame, use_x_num:int, x_num:int, func_seed:int, linear:
             "对数函数（加偏移防负值）": f'log({x_mark})',
             "Sigmoid 函数": f'1/(1＋e^-6{x_mark})',
             "三次多项式函数": f'2{x_mark}^3＋{x_mark}^(2)-2{x_mark}',
-            "指数幂函数": f'2^5({x_mark}＋1)',
-            "高频正弦函数": f'sin(2π{x_mark})',
+            "指数幂函数": f'2^({x_mark}＋1)',
+            "高频正弦函数": f'sin(6π{x_mark})',
             "混合三角+线性函数": f'1/5×sin(4x)＋(11/10)×{x_mark}',
             "高频正弦 + 线性项": f'sin(5π{x_mark})＋{x_mark}',
             "高频余弦函数": f'cos(6π{x_mark})',
@@ -233,10 +212,12 @@ def x_function(x: pd.DataFrame, use_x_num:int, x_num:int, func_seed:int, linear:
             "非线性频率正弦函数": f'sin(4πx({x_mark}＋1))'
         }
 
+        function_dict["线性函数"] = lambda f: linear_coef * f + linear_intercept
         functions = []
+
         for use_func in use_x_func:
 
-            functions.append((function_dict[use_func], functions_formula[use_func]))
+            functions.append((function_dict.get(use_func), functions_formula.get(use_func)))
 
         return random.choice(functions)
 
@@ -264,7 +245,6 @@ def x_function(x: pd.DataFrame, use_x_num:int, x_num:int, func_seed:int, linear:
 
         np.random.seed(seed_)
         func, func_name = select_func()
-
         X_i = func(x[x_mark].to_numpy())
         X = pd.concat([X, pd.DataFrame(X_i, columns=[func_name])], axis=1)
 
@@ -279,18 +259,6 @@ def x_function(x: pd.DataFrame, use_x_num:int, x_num:int, func_seed:int, linear:
 def x_to_x_function(x: pd.DataFrame, func_seed, x_to_x_num, x_sampled=None, x_to_x_level=3,use_xtox_func = None, **kwargs):
     
     X = pd.DataFrame()
-
-    xtox_func_dict = {
-    "和函数": lambda f: np.sum(f, axis=1),
-    "绝对值和函数": lambda f: np.abs(np.sum(f, axis=1)),
-    "正弦和函数": lambda f: np.sin(np.sum(f, axis=1)),
-    "余弦和函数": lambda f: np.cos(np.sum(f, axis=1)),
-    "正弦积函数": lambda f: np.sin(np.abs(np.prod(f, axis=1))),
-    "余弦积函数": lambda f: np.cos(np.abs(np.prod(f, axis=1))),
-    "积函数": lambda f: np.prod(f, axis=1),
-    "指数积函数": lambda f: np.exp(np.prod(f, axis=1)),
-    "除函数": lambda f: f[:, 0] / np.prod(f, axis=1),
-    }
 
     if use_xtox_func is None:
 
@@ -470,8 +438,8 @@ if __name__ == '__main__':
 
     for i in range(10):
 
-        x_, X_, y_exp_, x_picked_ = gen_y_exp(500, 10, 4, 1, x_num=1, x_to_x_level=3, redundancy=True, func_seed=1, x_seed=1, redun_seed=3, redun_ratio=6)
-        # print(i)
+        x_, X_, y_exp_, x_picked_ = gen_y_exp(500, 10, 4, 0, x_num=1, x_to_x_level=3, redundancy=True, func_seed=1, x_seed=1, redun_seed=3, redun_ratio=6)
+        print(i)
         # print(X_.columns)
 
 

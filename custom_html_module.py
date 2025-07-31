@@ -2,12 +2,525 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 
-import time
 import plotly.graph_objects as go
 from joblib import Parallel, delayed
 from stqdm import stqdm
 from typing import Literal, Union, Callable
 from cause_pair_functions.DPLS_jj import DPLS
+from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.naive_bayes import GaussianNB
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.svm import SVC
+from sklearn.tree import DecisionTreeClassifier
+
+function_dict = {
+    "线性函数": None,
+    "正弦函数": lambda f: np.cos(np.pi * f),
+    "余弦函数": lambda f: np.cos(np.pi * f),
+    "二次函数": lambda f: 2 * (f ** 2),
+    "平方根函数": lambda f: np.sqrt(np.abs(f)),
+    "指数函数": lambda f: np.exp(f),
+    "对数函数（平移）": lambda f: np.log(f + 1),
+    "对数函数（加偏移防负值）": lambda f: np.log(np.abs(f) + 1e-10),
+    "Sigmoid 函数": lambda f: 1 / (1 + np.exp(-6 * f)),
+    "三次多项式函数": lambda f: 2 * (f ** 3) + f ** 2 - 2 * f,
+    "指数幂函数": lambda f: 2 ** (f + 1),
+    "高频正弦函数": lambda f: np.sin(6 * np.pi * f),
+    "混合三角+线性函数": lambda f: 0.2 * np.sin(4 * f) + (11 / 10) * f,
+    "高频正弦 + 线性项": lambda f: np.sin(5 * np.pi * f) + f,
+    "高频余弦函数": lambda f: np.cos(6 * np.pi * f),
+    "高频正弦线性混合函数": lambda f: (1 / 10) * np.sin(10.6 * f) + (11 / 10) * f,
+    "非线性频率余弦函数": lambda f: np.cos(5 * np.pi * f * (f + 1)),
+    "非线性频率正弦函数": lambda f: np.sin(4 * np.pi * f * (f + 1)),
+}
+
+
+xtox_func_dict = {
+    "和函数": lambda f: np.sum(f, axis=1),
+    "绝对值和函数": lambda f: np.abs(np.sum(f, axis=1)),
+    "正弦和函数": lambda f: np.sin(np.sum(f, axis=1)),
+    "余弦和函数": lambda f: np.cos(np.sum(f, axis=1)),
+    "正弦积函数": lambda f: np.sin(np.abs(np.prod(f, axis=1))),
+    "余弦积函数": lambda f: np.cos(np.abs(np.prod(f, axis=1))),
+    "积函数": lambda f: np.prod(f, axis=1),
+    "指数积函数": lambda f: np.exp(np.prod(f, axis=1)),
+    "除函数": lambda f: f[:, 0] / np.prod(f, axis=1),
+}
+
+
+def cal_DPLS_obj(file_value:pd.DataFrame, **kwargs):
+
+    value_copy = file_value.copy()
+
+    DPLS_obj = DPLS(**kwargs).fit(value_copy[[kwargs['reason']]], value_copy[[kwargs['result']]], **kwargs)
+
+    return DPLS_obj
+
+
+# 4-2 方法参数映射（用于动态显示对应的子参数控件）
+DPLSR_param_dict = {
+    "cv": {
+        "type": "slider",
+        "label": "多重检验折数",
+        "min": 1,
+        "max": 10,
+        "step": 1,
+        "value": 5
+    },
+
+    "max_iter": {
+        "type": "slider",
+        "label": "DPLS最大迭代层",
+        "min": 1,
+        "max": 500,
+        "value": 20
+    },
+
+    "R_mode": {
+        "type": "select_slider",
+        "label": "求R模式",
+        "help": "[fusion]: 返回整个样本集的DPLSR, [single]: 返回每列的DPLSR",
+        "options": ['fusion', 'single'],
+        "value": 'fusion'
+    },
+
+    "fit_mode": {
+        "type": "selectbox",
+        "label": "Fit-矫正模式",
+        "help": "[Fit]: 纯 Fit, [CV]: 纯 CV, [Fit_rectify]: CV 结果用 Fit 矫正",
+        "options": ["Fit", 'CV', 'Fit_rectify'],
+        "value": "Fit_rectify"
+    },
+
+    "distance_pattern": {
+        "type": "multiselect",
+        "label": "核函数",
+        "help": "[Euc]:欧氏距离. [Mah]:曼哈顿距离, [Pairs]:成对组合距离, [Ming]:闵氏距离",
+        "options": ["Euc", 'Mah', 'Pairs', 'Ming'],
+        "value": "Euc"
+    },
+
+
+    "fit_intercept": {
+        "type": "checkbox",
+        "label": "截距项",
+        "value": False
+    },
+
+    "whiten": {
+        "type": "checkbox",
+        "label": "标准化",
+        "value": False
+    },
+    "square": {
+        "type": "checkbox",
+        "label": "距离矩阵左乘自己的转置",
+        "value": True
+    }
+}
+
+# 3-1 描述预处理
+preprocess_descriptions = {
+
+    "normalize": "标准化",
+    "regionalitze": "区域化,默认区域[-1,1]",
+    "Sort_by_reason": "样本根据原因升序排列",
+    "Xmean": "把X分组, 每组取平均值,以此获得平滑的新X",
+    "drop_Bias":"去除偏倚值",
+    "drop_NA":"去除空值",
+    "drop_duplicates_mean": "去除 reason 重复数据, result 取均值",
+    "add_noise": "对数据添加随机噪声",
+    "subsidiary_sampling": "组子采样, 把样本升序排列后分割成等宽的小组, 在每个小组内抽一个组成新样本集",
+
+    "to_DPLS_pred": "把 result 替换为 DPLS 预测值",
+    "None": "无预处理",
+
+}
+
+# 3-2 预处理的参数映射
+preprocess_param_controls = {
+
+    "normalize": {
+        'nan_mode': {"type": "selectbox", "label": "空值应对策略",
+                     "options": ['no', '0', 'mean'], "value": 'no', "help": "[no]: 仅呈递, [0]: 替换为0, [mean]: 替换为均值"},
+
+        'axis': {"type": "selectbox", "label": "方向", "help":"[1]: 按列标准化, [0], 按行标准化",
+                 "options": [1, 0], "value": 1},
+    },
+
+    "regionalitze": {
+        'nan_mode': {"type": "selectbox", "label": "空值应对策略","help":"[no]: 仅呈递, [0]: 替换为0, [mean]: 替换为均值",
+
+                     "options": ['no', '0', 'mean'], "value": 'no'},
+
+        'axis': {"type": "selectbox", "label": "方向","help":"[1]: 按列归一化, [0], 按行归一化",
+                 "options": [1, 0], "value": 1},
+    },
+
+    "add_noise": {
+        'noise_level': {"type": "slider", "label": "噪音强度", "min": 0.0, "max": 10.0, "value": 0.5, "step": 0.05},
+        'add_on': {"type": "selectbox",
+                   "label": "噪音添加位置","help":"[reason]: 噪音加在 reason 上, [result], 噪音加在 result 上",
+                   "options": ['reason', 'result'], "value": 'result'},
+        'noise_mode': {"type": "selectbox", "label": "噪音模式","help":"[normal]: 添加高斯噪音, [uniform], 添加均匀噪音",
+                       "options": ['normal', 'uniform'], "value": 'normal'},
+        'adjust': {"type": "checkbox", "label": "自适应噪音强度", "value": False, "help":"( noise_level *= DPLSR^2 )"},
+
+    },
+
+    "subsidiary_sampling": {
+        'subsidiary_width': {"type": "slider", "label": "组大小", "min": 2, "max": 5, "value": 2, "step": 1},
+    },
+
+    "to_DPLS_pred": {} | DPLSR_param_dict,
+
+    "Xmean": {
+    "mean_ratio": {
+        "type": "slider",
+        "label": "分组率, 分组越多则平滑程度越低",
+        "min": 0.1, "max": 1.0, "step": 0.1, "value": 0.5
+    },
+    "Xmean_mode": {
+        "type": "selectbox",
+        "label": "分组模式",
+        "help": "[uniform]: 每组宽度相等, [normal]: 每组概率相等",
+        "options": ['normal', 'uniform'],
+        "value": 'normal'
+    },
+    "Xmean_window": {
+        "type": "slider",
+        "label": "窗口长度, 即'勾搭臂长'",
+        "min": 1, "max": 10, "step": 1, "value": 2
+    },
+},
+
+    "drop_Bias": {
+    "Bias_threshold": {
+        "type": "slider",
+        "label": "界定偏倚值的σ阈值",
+        "min": 1.5, "max": 5.0, "step": 0.1, "value": 3.0
+    },
+}
+
+}
+
+# 4-1 方法的描述
+method_descriptions = {
+
+    "DPLS": "返回需要的 DPLS 实例属性",
+    "DPLSR": "计算 DPLSR ",
+    "PATH": "计算路径增量 Path delta",
+
+    "P_DPLSR": "计算指定 P 的 DPLS",
+    "DPLS_predR": "计算 reason 与 result_pred 之间的 DPLSR。",
+    "chain_stability": "多轮链式 DPLS 拟合，标准差衡量因果路径波动。",
+    "break_DPLSR": "将数据升序排列再分段后分别拟合，统计各段DPLSR之方差用于评估稳定性。",
+    'PersonR': "皮尔逊系数",
+    'variable_coefficient': "变异系数, CV = 方差/均值",
+
+    "PATH_tender": "不同滑动窗口下的 PATH 值序列，观察路径稳定性。",
+    "shuffle_path": "通过混淆样本原顺序, 改变重复值的排列, 提高估计路径结构稳定性。-脆弱的分析, 运行需要稳定的数据",
+    "GS": "使用地统计学核分类的 PATH",
+
+    "DPLSe_KCI": "DPLS(reason, result)的残差与的 reason 的 KCI 值",
+    "DPLSe_P_KCI": "计算指定 P 的 DPLS(reason, result) 的残差与的 reason 的 KCI 值",
+    'DPLSe_HSIC': "DPLS(reason, result)的残差与的 reason 的 HSIC 值",
+    "CMVe_DPLSR": "先排除 reason, result 内协变量的非线性影响, 再计算 reason_clear, result_clear 之间的 DPLSR.",
+    'CMVe_DPLSe_KCI': "先排除 reason, result 内协变量的非线性影响, 再计算 reason_clear, result_clear 之间的 DPLS 残差与 reason_clear 的 KCI。",
+    'aCMV_DPLSe_KCI': "先求出协变量, 把协变量和 reason 按列拼接: a_cmv=[reason,cmv], 再计算 a_cmv 和 result 之间的 DPLS 残差与 a_cmv 的 KCI。",
+
+    "is_Linear": "评估因果关系是否近似线性，返回双向相关系数。",
+
+}
+
+
+PATH_param_dict = {
+    "Path_centre": {"type": "checkbox", "label": "中心化后再求 PATH", "value": False},
+    "Path_normal": {"type": "checkbox", "label": "PATH 除以输入样本的标准差", "value": False},
+    "Path_window": {"type": "slider", "label": "delta间隔", "min": 1, "max": 10, "value": 1},
+    "Sort_by": {"type": "selectbox",
+                "label": "排序模式", "help":"[reason]: 仅根据 reason 排序,重复值保留原始顺序, [all]: result 参与排序,作为排序的次级依据",
+                "options": ["all", "reason", ], "value": "all"},
+}
+
+
+DPLS_needed_param = ["max_iter", "R2", "cv_R2", "fit_R2", "p", "cv_p", "fit_p", "y_pred_R2",]
+DPLS_attr_dict = {f"_{k}_": {"type": "checkbox", "label":f"_{k}_", "value": False, "inner_col": e%2} for e, k in enumerate(DPLS_needed_param)}
+
+print("DPLS_attr_dict", DPLS_attr_dict)
+
+
+method_param_controls = {
+
+    "DPLS": DPLS_attr_dict | DPLSR_param_dict,
+
+    "DPLSR": {} | DPLSR_param_dict,
+
+    "P_DPLSR": {
+        "P_mode": {
+            "type": "selectbox",
+            "label": "选择P类型",
+            "help": "在P_AB,P_BA中, [min]: P_min, [max]:P_max, [mean]: P_mean",
+            "options": ['min', 'max', 'mean'],
+            "value": "mean"
+        }
+    } | DPLSR_param_dict,
+
+    "DPLS_predR": {} | DPLSR_param_dict,
+
+    "PATH": {} | PATH_param_dict,
+
+    "GS": {
+        "GS_core": {
+            "type": "selectbox",
+            "label": "核函数类型",
+            "options": ["Matern"],
+            "value": "Matern"
+        },
+        "GS_ratio": {
+            "type": "slider",
+            "label": "比例参数, 0.5倍极差内的样本数 n^value",
+            "min": 0.1,
+            "max": 1.0,
+            "step": 0.1,
+            "value": 0.6
+        }
+    } | PATH_param_dict,
+
+    "shuffle_path": {
+        "Shuffle_times": {
+            "type": "slider",
+            "label": "混淆次数",
+            "min": 10,
+            "max": 2000,
+            "step": 10,
+            "value": 1000
+        }
+    } | PATH_param_dict,
+
+    "break_DPLSR": {
+        "break_parts": {
+            "type": "slider",
+            "label": "断点分段数",
+            "min": 2,
+            "max": 10,
+            "step": 1,
+            "value": 3
+        }
+    } | DPLSR_param_dict,
+
+    "chain_stability": {
+        "Chain_mode": {
+            "type": "selectbox",
+            "label": "链式模式",
+            "options": ["flow", "tree"],
+            "value": "flow"
+        },
+        "Chain_len": {
+            "type": "slider",
+            "label": "链长度",
+            "min": 2,
+            "max": 10,
+            "step": 1,
+            "value": 3
+        }
+    } | DPLSR_param_dict,
+
+    "PATH_tender": {
+        "Tender_length": {
+            "type": "slider",
+            "label": "倾向分析",
+            "min": 2,
+            "max": 10,
+            "step": 1,
+            "value": 5
+        }
+    } | PATH_param_dict,
+
+    "PersonR": {
+        "R2": {
+            "type": "checkbox",
+            "label": "返回R^2",
+            "value": True
+        }
+    },
+
+    "DPLSe_KCI": {} | DPLSR_param_dict,
+
+    "DPLSe_P_KCI": {
+        "P_mode": {
+            "type": "selectbox",
+            "label": "选择P类型",
+            "help": "在P_AB,P_BA中, [min]: P_min, [max]:P_max, [mean]: P_mean",
+            "options": ['min', 'max', 'mean'],
+            "value": "mean"
+        }
+    } | DPLSR_param_dict,
+
+    "CMVe_DPLSR": {
+        "CMV_mode": {
+            "type": "selectbox",
+            "label": "协变量来源",
+            "help": "[distance]: 来自A&B构成的距离矩阵, [origin]: 来自A&B原始矩阵",
+            "options": ['distance', 'origin'],
+            "value": 'distance'
+        },
+        "CMV_num": {
+            "type": "slider",
+            "label": "协变量数量 (距离矩阵的前n个主成分)",
+            "min": 1,
+            "max": 50,
+            "value": 1
+        }
+    } | DPLSR_param_dict,
+
+    "CMVe_DPLSe_KCI": {
+        "CMV_mode": {
+            "type": "selectbox",
+            "label": "协变量来源",
+            "help": "[distance]: 来自A&B构成的距离矩阵, [origin]: 来自A&B原始矩阵",
+            "options": ['distance', 'origin'],
+            "value": 'distance'
+        },
+        "CMV_num": {
+            "type": "slider",
+            "label": "协变量数量 (距离矩阵的前n个主成分)",
+            "min": 1,
+            "max": 50,
+            "value": 1
+        }
+    } | DPLSR_param_dict,
+
+    "aCMV_DPLSe_KCI": {
+        "CMV_mode": {
+            "type": "selectbox",
+            "label": "协变量来源",
+            "help": "[distance]: 来自 A&B 的融合距离矩阵, [origin]: 来自 A&B 原始矩阵拼接",
+            "options": ['distance', 'origin'],
+            "value": 'distance'
+        },
+        "CMV_num": {
+            "type": "slider",
+            "label": "协变量数量 (距离矩阵的前n个主成分)",
+            "min": 1,
+            "max": 50,
+            "value": 1
+        }
+    } | DPLSR_param_dict,
+
+    "is_Linear": {
+        "Test_times": {
+            "type": "slider",
+            "label": "测试次数",
+            "help": "is_Linear的判断基于多次测试",
+            "min": 1,
+            "max": 20,
+            "value": 5
+        },
+        "Test_ratio": {
+            "type": "slider",
+            "label": "测试比例",
+            "help": "每次测试抽取的样本数占总样本的比例",
+            "min": 0.1,
+            "max": 0.9,
+            "step": 0.05,
+            "value": 0.7
+        }
+    } | DPLSR_param_dict,
+
+}
+
+# 5-1 分类器的描述
+classify_description = {
+    "Logistic_classifyn": "用于二分类或多分类问题，通过逻辑函数输出概率值，简单高效，适合线性可分数据。",
+
+    "Decision_Tree": "通过构建树结构进行决策，易于理解和可视化，能够处理非线性关系但容易过拟合。",
+
+    "Random_Forest": "集成多个决策树，通过投票方式提高准确率，减少过拟合，适合高维数据。",
+
+    "SVM": "支持向量机用于寻找最佳分类边界，支持非线性分类（核函数），在高维空间表现良好。",
+
+    "KNN": "K近邻通过测量样本之间的距离，找出最近的K个邻居进行投票分类，适合小数据量问题。",
+
+    "Naive_Bayes": "基于贝叶斯定理和特征条件独立假设，计算效率高，适合文本分类等高维稀疏数据。",
+
+    "LDA": "线性判别分析，通过最大化类间方差与最小化类内方差来进行分类，也常用于降维。",
+
+}
+
+# 5-2 引用分类器
+classify_dict = {
+    "Logistic_Regression": LogisticRegression(),
+    "Decision_Tree": DecisionTreeClassifier(),
+    "Random_Forest": RandomForestClassifier(),
+    "SVM": SVC(probability=True),  # 设置 probability=True 以支持 predict_proba
+    "KNN": KNeighborsClassifier(),
+    "Naive_Bayes": GaussianNB(),
+    "LDA": LinearDiscriminantAnalysis(),
+
+}
+
+# 5-3 分类器参数映射
+classify_param_control = {
+
+    "Logistic_classifyn": {
+        "C": {"type": "slider", "label": "正则化强度 C", "min": 0.01, "max": 10.0, "value": 1.0, "step": 0.01},
+        "max_iter": {"type": "slider", "label": "最大迭代次数", "min": 100, "max": 10000, "value": 1000, "step": 100},
+        "penalty": {"type": "selectbox", "label": "正则化类型", "options": ["l2", "l1", "elasticnet", "none"],
+                    "value": "l2"},
+        "solver": {"type": "selectbox", "label": "优化器", "options": ["lbfgs", "liblinear", "saga", "newton-cg"],
+                   "value": "lbfgs"},
+
+        "parameter_optimization":{"type": "checkbox", "label": "自动参数寻优", "value":True },
+
+    },
+
+    "Decision_Tree": {
+        "max_depth": {"type": "slider", "label": "最大深度", "min": 1, "max": 30, "value": None},
+        "min_samples_split": {"type": "slider", "label": "最小划分样本数", "min": 2, "max": 20, "value": 2},
+        "criterion": {"type": "selectbox", "label": "划分标准", "options": ["gini", "entropy", "log_loss"],
+                      "value": "gini"},
+        "parameter_optimization":{"type": "checkbox", "label": "自动参数寻优", "value":True },
+    },
+
+    "Random_Forest": {
+        "n_estimators": {"type": "slider", "label": "树的数量", "min": 10, "max": 300, "value": 100, "step": 10},
+        "max_depth": {"type": "slider", "label": "最大深度", "min": 1, "max": 30, "value": None},
+        "min_samples_split": {"type": "slider", "label": "最小划分样本数", "min": 2, "max": 20, "value": 2},
+        "criterion": {"type": "selectbox", "label": "划分标准", "options": ["gini", "entropy", "log_loss"],
+                      "value": "gini"},
+        "parameter_optimization":{"type": "checkbox", "label": "自动参数寻优", "value":True },
+    },
+
+    "SVM": {
+        "C": {"type": "slider", "label": "惩罚参数 C", "min": 0.1, "max": 100.0, "value": 1.0, "step": 0.1},
+        "kernel": {"type": "selectbox", "label": "核函数类型", "options": ["rbf", "linear", "poly", "sigmoid"],
+                   "value": "rbf"},
+        "gamma": {"type": "selectbox", "label": "核系数 gamma", "options": ["scale", "auto"], "value": "scale"},
+        "parameter_optimization":{"type": "checkbox", "label": "自动参数寻优", "value":True },
+    },
+
+    "KNN": {
+        "n_neighbors": {"type": "slider", "label": "邻居数量", "min": 1, "max": 20, "value": 5},
+        "weights": {"type": "selectbox", "label": "加权策略", "options": ["uniform", "distance"], "value": "uniform"},
+        "metric": {"type": "selectbox", "label": "距离度量", "options": ["minkowski", "euclidean", "manhattan"],
+                   "value": "minkowski"},
+        "parameter_optimization":{"type": "checkbox", "label": "自动参数寻优", "value":True },
+    },
+
+    "Naive_Bayes": {
+        # GaussianNB参数少，通常无需调参，可作为 baseline
+    },
+
+    "LDA": {
+        "solver": {"type": "selectbox", "label": "求解器", "options": ["svd", "lsqr", "eigen"], "value": "svd"},
+        "shrinkage": {"type": "selectbox", "label": "收缩策略", "options": [None, "auto", "float"], "value": None},
+        "parameter_optimization": {"type": "checkbox", "label": "自动参数寻优", "value": True},
+    },
+
+}
 
 # 多重检验分折器
 def spliter(sample_num, cv: int = 5, mode: Literal['uniform', 'layers'] = 'layers', random_before: bool = False,
@@ -153,8 +666,6 @@ def parallel_wrapper(
 
 ) -> dict:
 
-    global title_bar_progress
-
     return_dict = {}
 
     if thread == 1:
@@ -173,192 +684,217 @@ def parallel_wrapper(
 
     return return_dict
 
-def param_controller(param_list: list, para_descriptions: dict, param_controls: dict, desc='', a_copied_dict: bool | str | int =False, expanded=True) -> dict:
+
+def param_control_core(param_key, control, key_name):
+
     param_kwargs = {}
 
-    m = 0
-    for param in param_list:
+    if control["type"] == "checkbox":
 
-        if param in param_controls:
+        if "help" in control:
 
-            with st.expander(
-                    f"{desc}\t{chr(9312 + m)}&nbsp;&nbsp;{param}:&nbsp;&nbsp;&nbsp;{para_descriptions.get(param, '')} ",
-                    expanded=expanded):
-                param_kwargs[param] = {}
-                st.markdown('---')
-
-                for param_key, control in param_controls[param].items():
-
-                    if not a_copied_dict:
-                        key_name = f"{param}_{param_key}"
-
-                    else:
-
-                        if a_copied_dict == 1:
-
-                            key_name = f"{param}_{param_key}_"
-
-                        else:
-                            key_name = f"{param}_{param_key}_{a_copied_dict}"
-
-                    if control["type"] == "checkbox":
-
-                        if "help" in control:
-
-                            param_kwargs[param][param_key] = st.checkbox(control["label"],
-                                                                         value=control.get("value", False),
-                                                                         key=key_name,
-                                                                         help=control["help"]
-                                                                         )
-
-                        else:
-
-                            param_kwargs[param][param_key] = st.checkbox(control["label"],
-                                                                         value=control.get("value", False),
-                                                                         key=key_name,
-                                                                         )
-
-
-                    elif control["type"] == "slider":
-
-                        if "help" in control:
-
-                            param_kwargs[param][param_key] = st.slider(
-                                control["label"],
-                                min_value=control["min"],
-                                max_value=control["max"],
-                                value=control["value"],
-                                step=control.get("step", 1),
-                                key=key_name,
-                                help=control["help"],
-                            )
-
-                        else:
-
-                            param_kwargs[param][param_key] = st.slider(
-                                control["label"],
-                                min_value=control["min"],
-                                max_value=control["max"],
-                                value=control["value"],
-                                step=control.get("step", 1),
-                                key=key_name
-                            )
-
-                    elif control["type"] == "selectbox":
-
-                        if "help" in control:
-
-                            param_kwargs[param][param_key] = st.selectbox(
-                                control["label"],
-                                control["options"],
-                                index=control["options"].index(control["value"]),
-                                key=key_name,
-                                help=control["help"],
-                            )
-                        else:
-
-                            param_kwargs[param][param_key] = st.selectbox(
-                                control["label"],
-                                control["options"],
-                                index=control["options"].index(control["value"]),
-                                key=key_name
-                            )
-
-                    elif control["type"] == "multiselect":
-
-                        if "help" in control:
-
-                            param_kwargs[param][param_key] = st.multiselect(
-                                control["label"],
-                                options=control["options"],
-                                default=control.get("value", []),
-                                key=key_name,
-                                help=control["help"],
-                            )
-                        else:
-                            param_kwargs[param][param_key] = st.multiselect(
-                                control["label"],
-                                options=control["options"],
-                                default=control.get("value", []),
-                                key=key_name
-                            )
-
-                    elif control["type"] == "select_slider":
-
-                        if "help" in control:
-
-                            param_kwargs[param][param_key] = st.select_slider(
-                                control["label"],
-                                options=control["options"],
-                                value=control.get("value", []),
-                                key=key_name,
-                                help=control["help"],
-                            )
-                        else:
-                            param_kwargs[param][param_key] = st.select_slider(
-                                control["label"],
-                                options=control["options"],
-                                value=control.get("value", []),
-                                key=key_name
-                            )
-
-
+            param_kwargs[param_key] = st.checkbox(control["label"],
+                                                         value=control.get("value", False),
+                                                         key=key_name,
+                                                         help=control["help"]
+                                                         )
 
         else:
-            with st.expander(
-                    f"{desc}\t{chr(9312 + m)}&nbsp;&nbsp;{param}:&nbsp;&nbsp;&nbsp;{para_descriptions.get(param, '')} ",
-                    expanded=False):
-                param_kwargs[param] = {}
-                st.markdown('---')
+
+            param_kwargs[param_key] = st.checkbox(control["label"],
+                                                         value=control.get("value", False),
+                                                         key=key_name,
+                                                         )
+
+
+    elif control["type"] == "slider":
+
+        if "help" in control:
+
+            param_kwargs[param_key] = st.slider(
+                control["label"],
+                min_value=control["min"],
+                max_value=control["max"],
+                value=control["value"],
+                step=control.get("step", 1),
+                key=key_name,
+                help=control["help"],
+            )
+
+        else:
+
+            param_kwargs[param_key] = st.slider(
+                control["label"],
+                min_value=control["min"],
+                max_value=control["max"],
+                value=control["value"],
+                step=control.get("step", 1),
+                key=key_name
+            )
+
+    elif control["type"] == "selectbox":
+
+        if "help" in control:
+
+            param_kwargs[param_key] = st.selectbox(
+                control["label"],
+                control["options"],
+                index=control["options"].index(control["value"]),
+                key=key_name,
+                help=control["help"],
+            )
+        else:
+
+            param_kwargs[param_key] = st.selectbox(
+                control["label"],
+                control["options"],
+                index=control["options"].index(control["value"]),
+                key=key_name
+            )
+
+    elif control["type"] == "multiselect":
+
+        if "help" in control:
+
+            param_kwargs[param_key] = st.multiselect(
+                control["label"],
+                options=control["options"],
+                default=control.get("value", []),
+                key=key_name,
+                help=control["help"],
+            )
+        else:
+            param_kwargs[param_key] = st.multiselect(
+                control["label"],
+                options=control["options"],
+                default=control.get("value", []),
+                key=key_name
+            )
+
+    elif control["type"] == "select_slider":
+
+        if "help" in control:
+
+            param_kwargs[param_key] = st.select_slider(
+                control["label"],
+                options=control["options"],
+                value=control.get("value", []),
+                key=key_name,
+                help=control["help"],
+            )
+        else:
+            param_kwargs[param_key] = st.select_slider(
+                control["label"],
+                options=control["options"],
+                value=control.get("value", []),
+                key=key_name
+            )
+
+    return param_kwargs
+
+def param_controller(param_list: list, para_descriptions: dict, param_controls: dict, desc='',
+                     a_copied_dict: bool | str | int =False, expanded:bool=True, cols:int=1, inner_cols:int=1) -> dict:
+
+    params_kwargs = {}
+
+    if cols > 5 or cols < 1:
+        cols = 1
+
+    if inner_cols > 5 or inner_cols < 1:
+        inner_cols = 1
+
+    m = 0
+    param_cols = st.columns([1]*cols)
+
+    for p, param in enumerate(param_list):
+
+        col = p%cols
+
+        with param_cols[col]:
+
+            if param in param_controls:
+
+                with st.expander(
+                        f"{desc}\t{chr(9312 + m)}&nbsp;&nbsp;{param}:&nbsp;&nbsp;&nbsp;{para_descriptions.get(param, '')} ",
+                        expanded=expanded):
+
+                    params_kwargs[param] = {}
+                    st.markdown('---')
+
+                    inner_param_cols = st.columns([1] * inner_cols)
+                    getout_inner = False
+
+                    for param_key, control in param_controls[param].items():
+
+
+                        if not a_copied_dict:
+                            key_name = f"{param}_{param_key}"
+
+                        else:
+
+                            if a_copied_dict == 1:
+
+                                key_name = f"{param}_{param_key}_"
+
+                            else:
+                                key_name = f"{param}_{param_key}_{a_copied_dict}"
+
+
+                        if 'inner_col' in control:
+
+                            inner_col = control['inner_col']
+
+                            with inner_param_cols[inner_col]:
+
+                                params_kwargs[param][param_key] = param_control_core(param_key=param_key,control=control,key_name=key_name)[param_key]
+
+                            getout_inner = True
+
+                        else:
+
+                            if getout_inner:
+
+                                st.markdown('---')
+                                getout_inner = False
+
+                            params_kwargs[param][param_key] = param_control_core(param_key=param_key, control=control,
+                                                                      key_name=key_name)[param_key]
+
+
+            else:
+                with st.expander(
+                        f"{desc}\t{chr(9312 + m)}&nbsp;&nbsp;{param}:&nbsp;&nbsp;&nbsp;{para_descriptions.get(param, '')} ",
+                        expanded=False):
+                    params_kwargs[param] = {}
+                    st.markdown('---')
 
         m += 1
-    return param_kwargs
+
+    return params_kwargs
 
 
 
 # X-y 对数据生成器
-def return_cause_pair(not_pair_data: pd.DataFrame, relation: Literal["AB", "BA", "AB&BA"] = "AB", prefix='', **kwargs):
-    if relation == "AB&BA":
+def return_cause_pair(not_pair_data: pd.DataFrame, prefix='', **kwargs):
 
-        relation = ["AB", "BA"]
-    else:
-        relation = [relation]
 
     pair_data = []
     pair_name = []
     pair_cause = []
 
-    for relation_ in relation:
+    data_in_pair = [
+        pd.concat([pd.DataFrame(not_pair_data.iloc[:, i]), pd.DataFrame(not_pair_data.iloc[:, -1])], axis=1)
+        for i in range(not_pair_data.shape[1] - 1)]
 
-        if relation_ == "AB":
-            data_in_pair = [
-                pd.concat([pd.DataFrame(not_pair_data.iloc[:, i]), pd.DataFrame(not_pair_data.iloc[:, -1])], axis=1)
-                for i in range(not_pair_data.shape[1] - 1)]
+    data_in_pair_format = []
+    for pair in data_in_pair:
+        pair.columns = [0, 1]
+        data_in_pair_format.append(pair)
 
-        elif relation_ == "BA":
+    pair_data.extend(data_in_pair_format)
+    pair_name.extend(["AB_" + f"{prefix}[{str(col_name)}]" for col_name in not_pair_data.columns[:-1]])
 
-            data_in_pair = [
-                pd.concat([pd.DataFrame(not_pair_data.iloc[:, -1]), pd.DataFrame(not_pair_data.iloc[:, i])], axis=1)
-                for i in range(not_pair_data.shape[1] - 1)]
-
-        else:
-            raise AssertionError(f"return_cause_pair函数无法识别relation参数{relation_}")
-
-        data_in_pair_format = []
-        for pair in data_in_pair:
-            pair.columns = [0, 1]
-            data_in_pair_format.append(pair)
-
-        pair_data.extend(data_in_pair_format)
-        pair_name.extend([relation_ + f"{prefix}[{str(col_name)}]" for col_name in not_pair_data.columns[:-1]])
-
-        if relation_ == "AB":
-
-            pair_cause.extend([1] * len(data_in_pair))
-
-
-        else:
-            pair_cause.extend([0] * len(data_in_pair))
+    pair_cause.extend([1] * len(data_in_pair))
 
     return pair_data, pair_name, pair_cause
 
@@ -372,14 +908,86 @@ def cal_DPLS_pred(file_value:pd.DataFrame,  **kwargs):
     return DPLS_obj.R2[0], DPLS_obj.y_pred[0]
 
 
-def cal_DPLS_obj(file_value:pd.DataFrame, **kwargs):
 
-    value_copy = file_value.copy()
+# 实现括号上色的程序1
+def colorize_brackets_by_depth(expr: str) -> str:
+    """
+    对表达式中的括号进行着色，按嵌套层级循环使用不同颜色，
+    并正确处理 LaTeX 中指数符号（^）所需的大括号匹配问题。
 
-    DPLS_obj = DPLS(**kwargs).fit(value_copy[[kwargs['reason']]], value_copy[[kwargs['result']]], **kwargs)
+    参数:
+        expr (str): 传入的原始字符串表达式（例如 "y = 2(2(x_2)^2)^2"）
 
-    return DPLS_obj
+    返回:
+        str: 添加 LaTeX 颜色标签后的表达式，可直接用于 st.latex() 渲染
+    """
+    colors = ['orange', 'red', 'blue', 'yellow', "green", "violet", 'brown', "lime"]
+    num_colors = len(colors)
+    result = ''  # 最终拼接的 LaTeX 字符串
+    depth = 0  # 括号嵌套深度
+    stack = []  # 颜色栈，用于匹配每个左括号的颜色
+    char_energy = np.array([])  # 存储每个 ^ 所在时的括号层级，用于后续决定在哪里闭合大括号
+    char_len = len(expr)
 
+    # 遍历每个字符
+    for i, char in enumerate(expr):
+
+        if char == '^':
+            # 遇到 ^ 开启指数，追加 ^{ 并记录当前 depth
+            result += '^' + '{'
+            char_energy = np.append(char_energy, depth)
+
+        elif char == '(':
+            # 左括号，根据当前 depth 上色并入栈
+            color = colors[depth % num_colors]
+            result += rf'\textcolor{{{color}}}{{(}}'
+            stack.append(color)
+            depth += 1
+
+        elif char == ')':
+
+            # 右括号，先结束 ^ 开启的大括号（若满足闭合条件）
+
+            if stack:
+                color = stack.pop()
+            else:
+                color = colors[0]  # 兜底：括号不匹配时默认颜色
+
+            # 统计在当前 depth 下应该关闭多少个 ^ 所开启的大括号
+            energy_exhausted = char_energy >= depth - 1
+            char_energy = char_energy[char_energy < depth - 1]
+
+            # 加上当前层级右括号
+
+            result += "}" * np.sum(energy_exhausted)  # 添加闭合括号
+            depth -= 1
+            result += rf'\textcolor{{{color}}}{{)}}'
+
+        else:
+            # 普通字符直接加入结果
+            result += char
+
+        # 若到达末尾，补齐所有未关闭的大括号
+        if i == char_len - 1:
+            result += "}" * len(char_energy)
+
+    return result
+
+
+# 实现括号上色的程序2
+def apply_colored_brackets(expr: str) -> str:
+    """
+    对整个表达式按加号（+）分隔后逐段处理括号着色。
+
+    参数:
+        expr (str): 传入的表达式（例如 "y = 2(2(x_2)^2)^2 + sin(πx_1)"）
+
+    返回:
+        str: 添加括号颜色的完整表达式
+    """
+    terms = expr.split('+')
+    colored_terms = [colorize_brackets_by_depth(term.strip()) for term in terms]
+    return ' + '.join(colored_terms)
 
 def render_dataset_title(title: str, font_size:float|int=26, align="left"):
     # 注入一次全局样式
@@ -559,6 +1167,7 @@ def render_noline_title(
 
 # 网页副分割线
 def hr_second(height=2, dark_color="#ffffff", light_color="#000000", left_px=0, right_px=0):
+
     """
     渲染一条自定义分隔线，自动适配暗/亮模式。
 
@@ -567,6 +1176,7 @@ def hr_second(height=2, dark_color="#ffffff", light_color="#000000", left_px=0, 
     - dark_color: 暗色模式下线条颜色（默认白色）
     - light_color: 浅色模式下线条颜色（默认黑色）
     """
+
     st.markdown(
         f"""
         <style>
@@ -592,13 +1202,134 @@ def hr_second(height=2, dark_color="#ffffff", light_color="#000000", left_px=0, 
     )
 
 
-def expand_raw_now_files(raw: dict, total_0, total_1, total_file, thread=1, expand=True, print_pred=False):
+def expand_raw_now_files(raw: dict, total_file, thread=1, expand=True, print_pred=False, block_id="test",
+                         checking_file:str | None = None, description_type:Literal['latex', 'str'] = 'str'):
 
-    check_file_panel = st.columns([1, 0.03, 1, 0.03, .72])
+
+    check_file_panel = st.columns([1.35, 3])
+
+    with check_file_panel[1]:
+
+        check_file_panel_2_expander = st.expander("File Details", expanded=expand)
+
+
+    def click_and_show(db_values):
+
+        if print_pred:
+
+            if "files_dpls_obj" in db_values:
+                checking_dpls_objs: dict = db_values["files_dpls_obj"]
+
+            else:
+                checking_dpls_objs: dict = parallel_wrapper(cal_DPLS_obj, db_values["files_pair"],
+                                                            desc="cal_DPLS_obj", reason=0, result=1,
+                                                            thread=thread)
+
+                db_values["files_dpls_obj"] = checking_dpls_objs
+
+        def click_and_show_():
+
+            check_plot_col, check_data_info_col = st.columns([2, 1])
+
+            with check_data_info_col:
+                with st.expander(f'**{values.shape}**', expanded=True):
+                    st.dataframe(values, height=382)
+
+            with check_plot_col:
+
+                fig_db = go.Figure()
+
+                # 添加 y_exp（蓝色），优先添加以保证 preds 最上层
+
+                fig_db.add_scatter(
+                    x=values[0],
+                    y=values[1],
+                    mode='markers',
+                    name='y_obs',
+                    marker=dict(
+                        color='#3580F5',
+                        size=6,
+                        opacity=0.75
+                    )
+                )
+
+                if print_pred:
+                    checking_dpls_obj = checking_dpls_objs.get(name, list(checking_dpls_objs.values())[db_values_count])
+                    checking_pred = checking_dpls_obj.y_pred[0]
+
+                    if checking_pred is not None:
+
+                        fig_db.add_scatter(
+                            x=values[0],
+                            y=checking_pred.flatten(),
+                            mode='markers',
+                            name='preds',
+                            marker=dict(
+                                color='#FFB420',
+                                size=4.5,
+                                opacity=0.82
+                            )
+                        )
+
+                # 更新坐标轴标签
+                fig_db.update_layout(
+                    xaxis_title=name[0],
+                    yaxis_title=name[1],
+                    legend=dict(
+                        traceorder="normal"  # 图例顺序按添加顺序排列
+                    )
+                )
+
+                # 更新布局
+                fig_db.update_layout(
+                    title=dict(
+                        text=f"",
+                        x=0.55,  # 居中，可调
+                        xanchor='right',
+                        font=dict(size=19),
+                    ),
+                    showlegend=False,
+                    height=430,
+                    margin=dict(t=40, b=10, l=7, r=10),
+                    paper_bgcolor='rgba(0,0,0,0)',
+                    plot_bgcolor='rgba(0,0,0,0)',
+                    xaxis=dict(showgrid=False, zeroline=False, showline=False, ticks='',
+                               showticklabels=True),
+                    yaxis=dict(showgrid=False, zeroline=False, showline=False, ticks='',
+                               showticklabels=True)
+                )
+
+                st.plotly_chart(fig_db, use_container_width=True)
+                st.markdown("")
+
+        first_expand = True
+        db_values_count = 0
+
+        for name, values in db_values["files_pair"].items():
+
+            if "X_name" in db_values:
+                expander_name = db_values["X_name"].get(name, list(db_values["X_name"].values())[db_values_count])
+            else:
+                expander_name = name
+
+            if first_expand:
+                with st.expander(f'{expander_name}', expanded=first_expand):
+                    click_and_show_()
+
+                after_expand = st.expander("**⋯**")
+                first_expand = False
+
+            else:
+
+                with after_expand:
+                    with st.expander(f'{expander_name}', expanded=True):
+                        click_and_show_()
+
+            db_values_count += 1
 
     with check_file_panel[0]:
 
-        with st.expander('原始值', expanded=expand):
+        with st.expander("", expanded=expand):
             # 文件列表标题
             raw_x_cols = st.columns([3, 4])
             raw_x_cols[0].markdown(
@@ -607,148 +1338,54 @@ def expand_raw_now_files(raw: dict, total_0, total_1, total_file, thread=1, expa
             raw_x_cols[1].markdown(
                 f"<div style='text-align: right; margin-top: 23px; padding-right: 20px;'> <span style='color: #55dd99; font-size:20px;'><strong>{total_file}</strong></span> files</div>",
                 unsafe_allow_html=True)
-            st.markdown("---")
-
-            for db_name, db_values in raw.items():
-
-                db_len = len(db_values["files_pair"])
-
-                with st.expander(f'{db_name} | {db_len} files'):
-
-                    for name, values in db_values["files_pair"].items():
-                        with st.expander(f'{name} | {values.shape}'):
-                            st.dataframe(values)
-
-        st.markdown("---")
-
-    with check_file_panel[2]:
-
-        with st.expander('Cause directions', expanded=expand):
-            # 文件列表标题
-            raw_y_cols = st.columns([4, 4])
-
-            raw_y_cols[0].markdown(
-                f"<div style='text-align: left; margin-top: 20px; padding-left: 20px;'> <span style='color: #4477dd; font-size:20px;'><strong>[{total_1}] </strong></span> A -> B</div>",
-                unsafe_allow_html=True)
-
-            raw_y_cols[1].markdown(
-                f"<div style='text-align: right; margin-top: 20px; padding-right: 20px;'> <span style='color: #dd4477; font-size:20px;'><strong>[{total_0}] </strong></span> B -> A</div>",
-                unsafe_allow_html=True)
-            st.markdown("---")
-
-            for db_name, db_values in raw.items():
-                db_len = len(db_values["files_cause"])
-
-                with st.expander(f'{db_name} | {db_len} files'):
-                    files_cause_df = pd.DataFrame.from_dict(db_values["files_cause"], orient='index')
-
-                    st.dataframe(files_cause_df)
-
-        st.markdown("---")
-        time.sleep(1)
-
-    with check_file_panel[4]:
-
-        with st.expander('Plots', expanded=expand):
-
-            raw_p_cols = st.columns([4, 4])
-
-            raw_p_cols[0].markdown(
-                "<div style='text-align: left; margin-top: 30px; padding-left:10px;'>图像数量</div>",
-                unsafe_allow_html=True)
-
-            raw_p_cols[1].markdown(
-                f"<div style='text-align: right; margin-top: 23px; padding-right: 20px;'> <span style='color: #55dd99; font-size:20px;'><strong>{total_file}</strong></span> plots</div>",
-                unsafe_allow_html=True)
 
             st.markdown("---")
 
             for db_name, db_values in raw.items():
 
-                db_len = len(db_values["files_pair"])
+                if st.button(f'{db_name}', key=f"{block_id}-{db_name}", use_container_width=True):
 
-                with st.expander(f'{db_name} | {db_len} files'):
+                    checking_file = db_name
 
-                    if print_pred:
 
-                        if "files_dpls_obj" in db_values:
-                            checking_dpls_objs:dict = db_values["files_dpls_obj"]
+            if not checking_file:
 
-                        else:
-                            checking_dpls_objs:dict = parallel_wrapper(cal_DPLS_obj, db_values["files_pair"], desc="cal_DPLS_obj", reason=0, result=1, thread=thread)
+                checking_file = db_name
 
-                    for name, values in db_values["files_pair"].items():
 
-                        with st.expander(f'{name} | {values.shape}'):
+            with check_file_panel_2_expander:
 
-                            fig_db = go.Figure()
 
-                            # 添加 y_exp（蓝色），优先添加以保证 preds 最上层
+                if raw[checking_file].get('description', False):
 
-                            fig_db.add_scatter(
-                                x=values[0],
-                                y=values[1],
-                                mode='markers',
-                                name='y_obs',
-                                marker=dict(
-                                    color='#3580F5',
-                                    size=6,
-                                    opacity=0.75
-                                )
-                            )
+                    db_description = raw[checking_file]['description']
 
-                            if print_pred:
+                else:
 
-                                checking_pred = checking_dpls_objs[name].y_pred[0]
+                    db_description = "No description"
 
-                                fig_db.add_scatter(
-                                    x=values[0],
-                                    y=checking_pred.flatten(),
-                                    mode='markers',
-                                    name='preds',
-                                    marker=dict(
-                                        color='#FFB420',
-                                        size=4.5,
-                                        opacity=0.82
-                                    )
-                                )
+                if description_type == 'latex':
 
-                            # 更新坐标轴标签
-                            fig_db.update_layout(
-                                xaxis_title=name[0],
-                                yaxis_title=name[1],
-                                legend=dict(
-                                    traceorder="normal"  # 图例顺序按添加顺序排列
-                                )
-                            )
+                    latex_expr = apply_colored_brackets(db_description)
+                    st.latex(latex_expr)
 
-                            # 更新布局
-                            fig_db.update_layout(
-                                title=dict(
-                                    text=f"DPLSR2: {checking_dpls_objs[name].R2[0]:.3f}" if print_pred else f"",
-                                    x=0.55,  # 居中，可调
-                                    xanchor='right',
-                                    font=dict(size=19),
-                                ),
-                                showlegend=False,
-                                height=430,
-                                margin=dict(t=40, b=10, l=7, r=10),
-                                paper_bgcolor='rgba(0,0,0,0)',
-                                plot_bgcolor='rgba(0,0,0,0)',
-                                xaxis=dict(showgrid=False, zeroline=False, showline=False, ticks='',
-                                           showticklabels=True),
-                                yaxis=dict(showgrid=False, zeroline=False, showline=False, ticks='',
-                                           showticklabels=True)
-                            )
+                else:
 
-                            st.plotly_chart(fig_db, use_container_width=True)
-                            st.markdown("")
+                    raw_y_cols = st.columns([2, 6.6])
 
-        st.markdown("---")
-        time.sleep(1)
+                    raw_y_cols[1].markdown(
+                        f"<div style='text-align: right; margin-top: 20px; padding-right: 20px; font-weight:400;'>{db_description}</div>",
+                        unsafe_allow_html=True)
 
-st.markdown("")
-st.markdown("")
-st.markdown("<h3 style='text-align: center;'>文件检视面板</h3>", unsafe_allow_html=True)
-st.markdown("")
-st.markdown("---")
+                    raw_y_cols[0].markdown(
+                        f"<div style='text-align: left; margin-top: 20px; padding-left: 20px;'> <strong>[{checking_file}] </strong></div>",
+                        unsafe_allow_html=True)
+
+                st.markdown("---")
+
+                click_and_show(raw[checking_file])
+
+            return checking_file
+
+
+
