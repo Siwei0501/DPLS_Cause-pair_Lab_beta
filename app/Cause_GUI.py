@@ -1,24 +1,20 @@
-import copy
-import glob
+
 import importlib.util
-import io
 import json
 import os
 import sys
-import time
-import traceback
+
 import webbrowser
-import zipfile
+import stqdm
 
 from sklearn.metrics import accuracy_score
 from sklearn.model_selection import GridSearchCV
 
 # 导入自定义模块
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from cause_pair_functions.casual_pair_tester import process, algorithms, return_values_DF
-from cause_pair_functions.muti_func_test import gen_y_exp
-from simplify_data_module import simplify_data_module
-from custom_html_module import *
+from GUI_functions.casual_pair_tester import process, algorithms, return_values_DF
+from GUI_modules.custom_GUI_module import *
+from GUI_modules.create_data_module import create_data
 
 # 0 设置与定义------------------------------------------------------------------------------------------------------------
 
@@ -53,7 +49,8 @@ local_data_dir = os.path.join(script_dir, 'Cause_DBs')
 project_dir = os.path.join(script_dir, 'config_file')
 #版本号
 now_version = "beta4"
-
+#全局变量字典
+page_param_dict = {}
 # 全局功能函数定义区 -------------------------------------------------------------------------------------------------------
 
 
@@ -342,7 +339,7 @@ st.markdown("""
 project_name_col, project_go_col, project_sep1, project_rename_col, project_sep2, project_select_col = st.columns([.8,.2,.01, .35,.02, .7])
 
 project_input = False
-
+now_project_name = None
 
 with project_go_col:
 
@@ -399,6 +396,23 @@ with load_project_:
 with load_select_project_col:
     load_select_1, load_select_2 = st.columns([.5, .5])
 
+
+    with load_select_2:
+
+        refresh_project_button = st.button('**↻**', use_container_width=True)
+
+        if refresh_project_button:
+            st.rerun()
+
+
+with project_rename_col:
+    project_rename_col_ = st.columns([6, 1])
+
+
+with project_rename_col_[1]:
+
+    save_project_button = st.button('💾', use_container_width=True)
+
     with load_select_1:
 
         load_project_button = st.button('✔', use_container_width=True)
@@ -408,31 +422,18 @@ with load_select_project_col:
                 with open(os.path.join(project_dir, selected_project), 'r', encoding='utf-8') as f:
                     input_project = json.load(f)
 
-                    print("classify_shuffle_seed", input_project["classify_shuffle_seed"])
-
                     project_input = True
                     st.session_state.update(input_project)
-                    st.toast(f'已读取项目: {selected_project[:-5]}')
-
-                    print("classify_shuffle_seed", st.session_state["classify_shuffle_seed"])
 
                     st.rerun()
 
-    with load_select_2:
+with project_rename_col_[0]:
 
-        refresh_project_button = st.button('**↻**', use_container_width=True)
 
-        if refresh_project_button:
-            st.rerun()
+    now_project_name = st.text_input('本次项目文件名', key="now_project_name", placeholder='在此输入本项目名',
+                                     help='输入文件名即可, 不需要加后缀如.json等', label_visibility='collapsed')
 
-with project_rename_col:
-    project_rename_col_ = st.columns([6, 1])
-
-    with project_rename_col_[0]:
-        now_project_name = st.text_input('本次项目文件名', key="now_project_name", placeholder='在此输入本项目名',
-                                         help='输入文件名即可, 不需要加后缀如.json等', label_visibility='collapsed')
-    with project_rename_col_[1]:
-        save_project_button = st.button('💾', use_container_width=True)
+    now_project_name_print = now_project_name if now_project_name else "Cause-pair Project"
 
 with load_last_project_col:
     load_last_project = st.button('运行上次项目', use_container_width=True)
@@ -462,39 +463,67 @@ with manage_project:
         webbrowser.open_new_tab(project_dir)
 
 with project_name_col:
-    st.markdown("""
-        <style>
-        @media (prefers-color-scheme: light) {
-            .cause-title {
-                color: #333333 !important;
-            }
-        }
-        @media (prefers-color-scheme: dark) {
-            .cause-title {
-                color: #ccc !important;
-            }
-        }
-        </style>
-        <div style='
-            text-align: left;
-            margin-top: -1px;
-            margin-left: 8px;
-        '>
-            <span class='cause-title' style='
-                font-size: 24px;
-                font-weight: 800;
-                padding-bottom: 0px;
-                display: inline-block;
-            '>Cause-pair Project</span>
-        </div>
-    """, unsafe_allow_html=True)
+
+    project_name_col_1, project_name_col_2 = st.columns([.1, 1])
+
+    with project_name_col_2:
+        st.markdown(f"""
+            <style>
+            @media (prefers-color-scheme: light) {{
+                .cause-title {{
+                    color: #333333 !important;
+                }}
+            }}
+            @media (prefers-color-scheme: dark) {{
+                .cause-title {{
+                    color: #ccc !important;
+                }}
+            }}
+            </style>
+            <div style='
+                text-align: left;
+                margin-top: 2px;
+                margin-left: -20px;
+            '>
+                <span class='cause-title' style='
+                    font-size: 24px;
+                    font-weight: 650;
+                    padding-bottom: 0px;
+                    display: inline-block;
+                '>{now_project_name_print}</span>
+            </div>
+        """, unsafe_allow_html=True)
+
+        with project_name_col_1:
+
+            st.button(f"**{now_project_name_print[:2]}**")
+
+
+
 st.markdown("---")
 
 
 use_data_options = ["模拟样本", "本地样本", "上传样本"]
+
 use_data_type = st.sidebar.selectbox("**选择分析的数据种类**", options=use_data_options, key="use_data_type")
+
 st.sidebar.markdown('---')
 st.sidebar.markdown('')
+
+report_zone = st.container()
+
+with report_zone:
+    st.empty()
+
+def error_to_report_zone(func):
+    def wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except Exception as e:
+            with report_zone:
+                st.error(f"错误：{str(e)}")
+    return wrapper
+
 Thread = st.sidebar.slider("并行线程数: 轻量任务以及报错时设置值 = 1", 1, 16, 1, key='Thread')
 st.sidebar.markdown('')
 
@@ -511,6 +540,7 @@ local_data_dir = os.path.join(script_dir, 'Cause_DBs')
 
 
 # 读取文件描述
+
 def read_txt_or_default(filepath):
     description_path = os.path.join(filepath, 'description.txt')
 
@@ -522,6 +552,7 @@ def read_txt_or_default(filepath):
 
 
 # 本地文件读取器
+
 def data_presenter(dataset_name, **dataset_kwargs):
 
     module_name = "pair_data_presenter"
@@ -534,7 +565,7 @@ def data_presenter(dataset_name, **dataset_kwargs):
     spec.loader.exec_module(module)  # 执行模块代码
 
     # 现在可以调用模块中的内容
-    pair_presented_data, col_names, cause_y = module.return_cause_pair(**dataset_kwargs)  # 假设模块中有 some_function()
+    pair_presented_data, col_names, files_causes_y, files_X, filex_y = module.return_cause_pair(**dataset_kwargs)  # 假设模块中有 some_function()
 
     description_path = os.path.join(local_data_dir, dataset_name, 'description.txt')
 
@@ -544,7 +575,7 @@ def data_presenter(dataset_name, **dataset_kwargs):
     except (FileNotFoundError, PermissionError) as e:
         description =  "No description"
 
-    return pair_presented_data, col_names, cause_y, description
+    return pair_presented_data, col_names, files_causes_y, files_X, filex_y, description
 
 
 st.set_page_config(layout="wide")
@@ -583,28 +614,24 @@ with host_panel_sep1:
 if st.session_state.get(f"use_files_dict", False):
 
     use_files_dict = st.session_state.get(f"use_files_dict")
-    print('get use_files_dict')
 
 else:
 
     use_files_dict = {}
-    print('not get use_files_dict')
 
 
 if st.session_state.get(f"processed_files_dict", False):
 
     processed_files_dict = st.session_state.get(f"processed_files_dict")
-    print('get processed_files_dict')
 
 else:
 
     processed_files_dict = {}
-    print('processed_files_dict')
 
 
 # 3-3 选择预处理
 with host_panel_preprocess:
-    st.markdown("")
+
     st.markdown("")
     st.markdown(
         "<h3 style='text-align: center;'>预处理</h3>",
@@ -630,6 +657,9 @@ with host_panel_preprocess:
                 desc='预处理'
             )
 
+            page_param_dict.update(preprocess_kwargs)
+
+
 def do_process_one(files_pair, preprocess_selection_, reverse=False):
 
     # 默认第一列为原因
@@ -640,7 +670,6 @@ def do_process_one(files_pair, preprocess_selection_, reverse=False):
         reason = 1
         result = 0
 
-    print(files_pair.copy)
     pairs_processed = files_pair.copy()
 
     for p, preprocess in enumerate(preprocess_selection_):
@@ -653,6 +682,7 @@ def do_process_one(files_pair, preprocess_selection_, reverse=False):
                                                )
 
     return pairs_processed
+
 
 
 def do_process(raw, preprocess_selection_, reverse=False) -> dict:
@@ -695,6 +725,10 @@ total_file = 0
 # 7-1 分析本地数据-----------------------------------------------------------------------------------------------------
 raw_files_dict = {}
 
+print("use_data_typee", use_data_type )
+print("use_data_type_in_sesstion", st.session_state["use_data_type"])
+print("use_data_type == use_data_options[1]", use_data_type == use_data_options[1])
+
 if use_data_type == use_data_options[1]:
 
     # 3-1-1 读取本地数据 ----------------------------------------------------------------------------------------------
@@ -712,7 +746,6 @@ if use_data_type == use_data_options[1]:
     with host_panel_files:
 
         st.markdown("")
-        st.markdown("")
         st.markdown(
             "<h3 style='text-align: center;'>选择文件</h3>",
             unsafe_allow_html=True
@@ -727,28 +760,28 @@ if use_data_type == use_data_options[1]:
 
         # 选择要分析的数据集
         database_selections = st.multiselect(label='分析本地数据集 (可多选)',
-                                             key="database_selections", placeholder="本地数据集 (可多选)",
+                                             key="local_database_selections", placeholder="本地数据集 (可多选)",
                                              options=list(local_datasets),
                                              default=list(local_datasets)[0], label_visibility='collapsed')
 
         st.markdown("---")
 
         data_sort_mode = st.selectbox(label='文件排序',
-                                      key="data_sort_mode",
+                                      key="local_data_sort_mode",
                                       options=["按首字母", "按大小"],
                                       )
-
-        illegal_compatible_mode = st.selectbox("非法样本兼容", [True, False], key="illegal_compatible_mode")
 
         direction_panel = st.columns([1, 1])
 
         # 文件方向
         with direction_panel[0]:
-            file_direction = st.selectbox("样本方向", ["AB&BA", "AB", "BA", ], key="file_direction")
+            illegal_compatible_mode = st.selectbox("非法样本兼容", [True, False], key="local_illegal_compatible_mode")
+            file_direction = st.selectbox("样本方向", ["AB&BA", "AB", "BA", ], key="local_file_direction")
 
         # 分析方向
         with direction_panel[1]:
-            preprocess_direction = st.selectbox("预处理方向", ["AB&BA", "AB", "BA"], key="preprocess_direction")
+            DPLS_workspace = st.selectbox("**DPLS_workspace**", ['fusion', 'single'], key="local_DPLS_workspace")
+            preprocess_direction = st.selectbox("预处理方向", ["AB&BA", "AB", "BA"], key="local_preprocess_direction")
 
         col_file_num, col_test_seed = st.columns([1, 1])
 
@@ -759,7 +792,7 @@ if use_data_type == use_data_options[1]:
                 max_value=10000,
                 value=50,
                 step=10
-                , key="test_files_num")
+                , key="local_test_files_num")
 
         with col_test_seed:
             seed_value = st.number_input(
@@ -768,17 +801,18 @@ if use_data_type == use_data_options[1]:
                 max_value=20000,
                 value=42,
                 step=1
-                , key="seed_value")
+                , key="local_seed_value")
 
-        thresh_range = st.slider("样本数限制在", 0, 10000, (100, 1500), key="thresh_range", step=100)
+        thresh_range = st.slider("样本数限制在", 0, 10000, (100, 1500), key="local_thresh_range", step=100)
 
         check_file_button = st.button("**读取文件**", use_container_width=True)
         check_file_with_DPLS_button = st.button("**读取并预测 DPLS**", use_container_width=True)
 
     # 7-1-4 收集参数 -------------------------------------------------------------------------------------------------
 
-    file_param = {
-        "正在使用": f"{use_data_type}",
+    file_transfer_param = {
+
+        "正在使用": use_data_type,
         "非法样本兼容": illegal_compatible_mode,
         '样本方向': file_direction,
         '预处理方向': preprocess_direction,
@@ -788,19 +822,33 @@ if use_data_type == use_data_options[1]:
 
     }
 
+    file_param = {
+
+        "local_use_data_type": use_data_type,
+        "local_illegal_compatible_mode": illegal_compatible_mode,
+        'local_file_direction': file_direction,
+        'local_preprocess_direction': preprocess_direction,
+        'local_test_files_num': test_files_num,
+        'local_seed_value': seed_value,
+        'local_thresh_range': thresh_range,
+
+    }
+
+    page_param_dict.update(file_param)
     db_select_kwargs = {'relation': file_direction, 'threshold': list(thresh_range), 'seed': seed_value, 'test_SAMPLE': test_files_num}
+
 
 elif use_data_type == use_data_options[0]:
 
     with host_next:
 
-        raw_files_dict, file_param = simplify_data_module('Cause_GUI', thread=Thread)
+        raw_files_dict, file_param = create_data('Cause_GUI', thread=Thread)
 
 
     # 7-2-2 与 本地文件模式共用的功能部分 ----------------------------------------------------------------------------
+
     with host_panel_files:
 
-        st.markdown("")
         st.markdown("")
         st.markdown(
             "<h3 style='text-align: center;'>选择文件</h3>",
@@ -810,7 +858,7 @@ elif use_data_type == use_data_options[0]:
         create_file_panel_expander = st.expander("**Created_files**", expanded=True)
 
 
-    with (create_file_panel_expander):
+    with create_file_panel_expander:
 
         if raw_files_dict:
             create_db_default = ["All"]
@@ -819,11 +867,9 @@ elif use_data_type == use_data_options[0]:
 
             create_db_default = []
 
-        print("create_db_default", create_db_default)
-
         # 选择要分析的数据集
         database_selections = st.multiselect(label='模拟数据集 (可多选)',
-                                             key="database_selections", placeholder="本地数据集 (可多选)",
+                                             key="create_database_selections", placeholder="本地数据集 (可多选)",
                                              options=create_db_default + list(raw_files_dict.keys()),
                                              default=create_db_default, label_visibility='collapsed')
 
@@ -832,40 +878,65 @@ elif use_data_type == use_data_options[0]:
 
         st.markdown("---")
 
-        illegal_compatible_mode = st.selectbox("非法样本兼容", [True, False], key="illegal_compatible_mode")
-
         col_file_num, col_test_seed = st.columns([1, 1])
 
         with col_file_num:
+            illegal_compatible_mode = st.selectbox("非法样本兼容", [True, False], key="illegal_compatible_mode")
             test_files_num = st.number_input(
                 "文件抽样数",
                 min_value=10,
                 max_value=file_param.get('test_files_num', 20),
                 value=file_param.get('test_files_num', 20),
                 step=10
-                , key="test_files_num")
+                , key="create_test_files_num")
 
         with col_test_seed:
+            DPLS_workspace = st.selectbox("**DPLS_workspace**", ['fusion', 'single'], key="create_DPLS_workspace")
             seed_value = st.number_input(
                 "文件抽样种子",
                 min_value=0,
                 max_value=20000,
-                value=file_param.get('seed_value', 42),
+                value=42,
                 step=1
-                , key="seed_value")
+                , key="create_seed_value")
+
+        if create_db_default:
+            st.markdown("")
+            gui_success(f'接收到来自模拟器的 {len(raw_files_dict)} 个函数')
+            st.markdown("---")
 
         check_file_button = st.button("**读取文件**", use_container_width=True)
         check_file_with_DPLS_button = st.button("**读取并预测 DPLS**", use_container_width=True)
 
     if not create_db_default:
-        with host_panel_files:
-            st.markdown("")
-            st.markdown("")
-            st.markdown(""" <div style="text-align: center; font-weight:300; font-size: 18px;"> ⚠️ 没有检测到数据, 请生成模拟数据后推送至项目 </div>
-            """, unsafe_allow_html=True)
+        with report_zone:
+
+            gui_warning('⚠️ 还未生成模拟数据, 请确认模拟数据参数后点击 [推送到项目]')
+
             st.markdown("---")
 
-    db_select_kwargs = {'relation': "AB", 'threshold': file_param['thresh_range'], 'seed': seed_value, 'test_SAMPLE': test_files_num}
+
+    file_transfer_param = {
+
+        "正在使用": use_data_type,
+        "非法样本兼容": illegal_compatible_mode,
+        '文件抽样数': test_files_num,
+        '随机种子': seed_value,
+
+    }
+
+    file_param.update({
+
+        "create_use_data_type": use_data_type,
+        "create_illegal_compatible_mode": illegal_compatible_mode,
+        'create_test_files_num': test_files_num,
+        'create_seed_value': seed_value,
+
+    })
+
+    page_param_dict.update(file_param)
+
+    db_select_kwargs = {'relation': file_param.get('relation', "AB"), 'seed': seed_value, 'test_SAMPLE': test_files_num}
 
 
     # 7-3 定义[上传]数据参数控制面板 --------------------------------------------------------------------------------------------
@@ -874,7 +945,6 @@ elif use_data_type == use_data_options[2]:
 
     with host_panel_files:
 
-        st.markdown("")
         st.markdown("")
         st.markdown(
             "<h3 style='text-align: center;'>选择文件</h3>",
@@ -925,7 +995,6 @@ elif use_data_type == use_data_options[2]:
                         continue
                     uploaded_files_dict[uploaded_file.name] = df
 
-
     upload_files_cause = ['Unknown'] * len(use_files_dict.keys())
     raw_files_dict["Upload_files"] = {"files_pair": uploaded_files_dict, "files_cause": dict(zip(use_files_dict.keys(), upload_files_cause))}
     total_file = len(use_files_dict)
@@ -938,44 +1007,61 @@ elif use_data_type == use_data_options[2]:
 
         st.markdown("---")
 
-        illegal_compatible_mode = st.selectbox("非法样本兼容", [True, False], key="illegal_compatible_mode")
-
         col_file_num, col_test_seed = st.columns([1, 1])
 
         with col_file_num:
+            illegal_compatible_mode = st.selectbox("非法样本兼容", [True, False], key="upload_illegal_compatible_mode")
             test_files_num = st.number_input(
                 "文件抽样数",
                 min_value=0,
                 max_value=len(uploaded_files_dict),
                 value=len(uploaded_files_dict),
                 step=10
-                , key="test_files_num")
+                , key="upload_test_files_num")
 
         with col_test_seed:
+            DPLS_workspace = st.selectbox("**DPLS_workspace**", ['fusion', 'single'], key="upload_DPLS_workspace")
             seed_value = st.number_input(
                 "文件抽样种子",
                 min_value=0,
                 max_value=20000,
                 value=42,
                 step=1
-                , key="seed_value")
+                , key="upload_seed_value")
 
-        thresh_range = st.slider("样本数限制在", 0, 10000, (100, 1500), key="thresh_range", step=100)
-
-        file_param = {
-            "正在使用": f"{use_data_type}",
-            "非法样本兼容": illegal_compatible_mode,
-        }
+        thresh_range = st.slider("样本数限制在", 0, 10000, (100, 1500), key="upload_thresh_range", step=100)
 
         check_file_button = st.button("**读取**", use_container_width=True)
         check_file_with_DPLS_button = st.button("**读取并预测 DPLS**", use_container_width=True)
 
+
+    file_transfer_param = {
+
+        "正在使用": use_data_type,
+        "非法样本兼容": illegal_compatible_mode,
+        '文件抽样数': test_files_num,
+        '随机种子': seed_value,
+        '样本量': thresh_range,
+
+    }
+
+    file_param = {
+
+        "upload_use_data_type": use_data_type,
+        "upload_illegal_compatible_mode": illegal_compatible_mode,
+        'upload_test_files_num': test_files_num,
+        'upload_seed_value': seed_value,
+        'upload_thresh_range': thresh_range,
+    }
+
+    page_param_dict.update(file_param)
     db_select_kwargs = {'relation': "AB", 'threshold': thresh_range, 'seed': seed_value,
                         'test_SAMPLE': test_files_num}
 
 else:
 
     raise AttributeError(f'Do not understand parameter {use_data_type}')
+
 
 if use_data_type != use_data_options[0]:
     hr_second()
@@ -987,6 +1073,7 @@ hr_second()
 
 classify_panel_col, classify_panel_sep, classify_panel_file_detial= st.columns(
     [.496,.03, .8])
+
 
 with classify_panel_sep:
     st.markdown("""
@@ -1026,6 +1113,8 @@ with classify_panel_col:
 
 with classify_panel_expander:
 
+    classify_param_dict = {}
+
     # 5-4 选择分类器
     classify_selection = st.multiselect("分类方法 (可多选)", ['All'] + list(classify_dict.keys()),
                                                 key="classify_selection")
@@ -1054,6 +1143,14 @@ with classify_panel_expander:
 
     hr_second()
 
+    classify_param_dict = {
+        "classify_selection": classify_selection,
+        "cv_mode": cv_mode,
+        "classify_shuffle_seed": classify_shuffle_seed,
+        "classify_shuffle_confirm": classify_shuffle_confirm,
+        "classify_cv": classify_cv
+    }
+
     # 5-6 分类器打印内容
     if classify_selection:
         classify_print = {r + 1: classify_ for r, classify_ in enumerate(classify_selection)}
@@ -1062,21 +1159,20 @@ with classify_panel_expander:
 
     if classify_selection:
 
-            st.markdown('')
-            classify_kwargs = param_controller(
-                param_list=classify_selection,
-                para_descriptions=classify_description,
-                param_controls=classify_param_control,
-                desc='分类',cols=2
-            )
+        st.markdown('')
+        classify_kwargs = param_controller(
+            param_list=classify_selection,
+            para_descriptions=classify_description,
+            param_controls=classify_param_control,
+            desc='分类',cols=2
+        )
 
+        classify_param_dict.update(classify_kwargs)
 
+    page_param_dict.update(classify_param_dict)
 
 # 分类方法执行器
 def do_classify(classify_name, file_values: pd.DataFrame, **kwargs):
-    # global title_bar_progress
-    # global total_mission
-    # global now_mission
 
     if classify_name in classify_dict:
         classify_model = classify_dict[classify_name]
@@ -1130,6 +1226,7 @@ def do_classify(classify_name, file_values: pd.DataFrame, **kwargs):
 
     X = file_values.iloc[:, :-1]
     y = file_values.iloc[:, -1]
+
 
     train_list, test_list = spliter(X.shape[0], cv=classify_cv, mode=cv_mode, random_before=classify_shuffle_confirm,
                                     shuffle_seed=classify_shuffle_seed, )
@@ -1186,7 +1283,6 @@ with classify_panel_file_detial:
     st.markdown("---")
 
 
-
 with method_panel_sep:
     st.markdown("""
         <style>
@@ -1222,6 +1318,8 @@ with method_panel_col:
 
     method_select_expander = st.expander("methods", expanded=True)
 
+    method_param_dict = {}
+
     with method_select_expander:
 
         # 4-3 选择方法
@@ -1235,6 +1333,9 @@ with method_panel_col:
         method_output_button = st.button("输出", key='method_output_button', use_container_width=True)
 
         hr_second()
+
+        method_param_dict["create_method_selection"] = method_selection
+        method_param_dict["methods_direction"] = methods_direction
 
     # 4-4 方法的打印内容
     if method_selection:
@@ -1253,10 +1354,11 @@ with method_panel_col:
                 desc='方法'
             )
 
+        method_param_dict.update(method_kwargs)
 
-if check_file_button or check_file_with_DPLS_button or method_output_button or classify_output_button:
 
-    print('check_file_button')
+if check_file_button or check_file_with_DPLS_button or page_param_dict.get(f'Cause_GUI_pushed_create',False) or method_output_button or classify_output_button :
+
 
     use_files_dict = {}
     processed_files_dict = {}
@@ -1269,10 +1371,12 @@ if check_file_button or check_file_with_DPLS_button or method_output_button or c
 
         if use_data_type == use_data_options[1]:
 
-            read_files, file_names, files_cause, file_description = data_presenter(database, **db_select_kwargs)
+            read_files, file_names, files_cause, db_X, db_y, file_description = data_presenter(database, **db_select_kwargs)
             raw_files_dict[database] = {"files_pair": dict(zip(file_names, read_files)),
                                      "files_cause": dict(zip(file_names, files_cause)),
-                                    "description": file_description}
+                                    "description": file_description,
+                                    "X": db_X, "y": db_y,
+            }
 
         else:
 
@@ -1327,11 +1431,11 @@ if check_file_button or check_file_with_DPLS_button or method_output_button or c
     del raw_files_dict
 
 
+
 # 模拟样本的独立功能区, 单独于 host_panel_check_file 外 ----------------------------------------------------------------------
 
 
 with host_panel_file_detial:
-    st.markdown("")
     st.markdown("")
     st.markdown(
         "<h3 style='text-align: center;'>读取的文件</h3>",
@@ -1354,12 +1458,24 @@ if check_file_button or check_file_with_DPLS_button or processed_files_dict:
 
         with st.spinner("正在加载文件..."):
 
-            st.session_state['checking_file'] = expand_raw_now_files(processed_files_dict, expand=True,
-                                                                     total_file=total_file, block_id=use_data_options.index(use_data_type),
+            if DPLS_workspace == 'single':
+
+
+
+                st.session_state['checking_file'] = single_workspace(processed_files_dict, expand=True,
+                                                                         total_file=total_file, block_id=use_data_options.index(use_data_type),
+                                                                         description_type= 'latex' if use_data_options.index(use_data_type) == 0 else 'str',
+                                                                         print_pred=st.session_state.get('print_pred',False),
+                                                                         thread=Thread,
+                                                                         checking_file=st.session_state['checking_file'])
+
+            elif DPLS_workspace == 'fusion':
+
+                st.session_state['checking_file'] = fusion_workspace(processed_files_dict, total_file=total_file,
+                                                                     block_id=use_data_options.index(use_data_type),
                                                                      description_type= 'latex' if use_data_options.index(use_data_type) == 0 else 'str',
-                                                                     print_pred=st.session_state.get('print_pred',False),
-                                                                     thread=Thread,
-                                                                     checking_file=st.session_state['checking_file'])
+                                                                     checking_file=st.session_state['checking_file'], thread=Thread)
+
 
 # 3-4 预处理的打印内容
 if preprocess_selection:
@@ -1381,6 +1497,7 @@ else:
 
 
 # Methods 值的计算器
+
 def cal_values(file_pairs, reverse=False):
 
 
@@ -1435,26 +1552,40 @@ with method_panel_file_detial:
 
 if method_output_button or classify_output_button:
 
-    use_values_dict = {}
+    if st.session_state.get('method_param_dict', False):
 
-    method_run_AB = methods_direction in ["AB", "AB&BA"]
-    method_run_BA = methods_direction in ["BA", "AB&BA"]
+        method_changed = (st.session_state['method_param_dict'] != method_param_dict)
+        print("method_changed", method_changed)
+    else:
+        method_changed = True
+        print("method_changed", method_changed)
 
-    for db_name, db_values in use_files_dict.items():
+    if method_changed:
 
-        db_cal_values = []
+        use_values_dict = {}
 
-        if method_run_AB:
+        method_run_AB = methods_direction in ["AB", "AB&BA"]
+        method_run_BA = methods_direction in ["BA", "AB&BA"]
 
-            db_cal_values.append(cal_values(db_values["files_pair"]))
+        for db_name, db_values in use_files_dict.items():
 
-        if method_run_BA:
+            db_cal_values = []
 
-            db_cal_values.append(cal_values(db_values["files_pair"], reverse=True))
+            if method_run_AB:
 
-        use_values_dict[db_name] = pd.concat(db_cal_values, axis=1)
+                db_cal_values.append(cal_values(db_values["files_pair"]))
 
-    st.session_state["use_values_dict"] = use_values_dict
+            if method_run_BA:
+
+                db_cal_values.append(cal_values(db_values["files_pair"], reverse=True))
+
+            use_values_dict[db_name] = pd.concat(db_cal_values, axis=1)
+
+        st.session_state["use_values_dict"] = use_values_dict
+        st.session_state['method_param_dict'] = method_param_dict.copy()
+
+    else:
+        pass
 
 
 if use_values_dict:
@@ -1462,24 +1593,78 @@ if use_values_dict:
     with method_panel_file_detial:
 
         with st.expander('方法值', expanded=True):
-            st.dataframe(pd.concat(list(use_values_dict.values()), axis=0), height=1157)
 
+            method_print_DF = pd.concat(list(use_values_dict.values()), axis=0)
+            # 合并 y 数据
+            method_y_df = pd.concat(
+                [pd.DataFrame.from_dict(db['files_cause'], orient='index', columns=['y']) for db in use_files_dict.values()],
+                axis=0
+            )
+            method_print_DF = pd.concat([method_print_DF, method_y_df], axis=1)
+
+            st.dataframe(method_print_DF, height = 1157)
+
+classify_results = st.session_state.get("classify_results", {})
+classify_results_DF = pd.DataFrame.from_dict(classify_results, orient='index') if classify_results else pd.DataFrame()
 
 
 if classify_output_button:
 
-    classify_results = {}
+    # 判断参数是否变化
+    classify_changed = st.session_state.get('classify_param_dict') != classify_param_dict
 
-    if use_values_dict:
+    if classify_changed:
 
-        file_values = pd.concat(list(use_values_dict.values()), axis=0)
+        files_values = pd.concat(list(use_values_dict.values()), axis=0)
 
-        for classify in classify_selection:
+        # 合并 y 数据
+        y_df = pd.concat(
+            [pd.DataFrame.from_dict(db['files_cause'], orient='index') for db in use_files_dict.values()],
+            axis=0
+        )
+        files_values = pd.concat([files_values, y_df], axis=1)
 
-            classify_result = do_classify(classify, file_values=file_values, **classify_kwargs.get(classify, {}))
-            classify_results[classify] = classify_result
-    
+        # 检查非法样本
+        if classify_selection:
+            num_rows_with_nan = files_values.isna().any(axis=1).sum()
+            if num_rows_with_nan > 0:
+                msg = f"检测到[{num_rows_with_nan}]个非法样本"
+                if illegal_compatible_mode:
+                    files_values = files_values.dropna(axis=0, how='any')
+                    msg += ", 已移除"
+                else:
+                    msg += ", 若报错请尝试在[非法样本兼容模式]下分析"
+                with report_zone:
+                    st.warning(msg)
+                st.warning(msg)
 
+        # 分类执行
+        with classify_panel_file_detial:
+            classify_results = {}
+            classify_bar = stqdm(classify_selection, total=len(classify_selection))
+            for classify in classify_selection:
+                classify_bar.set_description(f"正在执行:{classify}")
+                classify_results[classify] = do_classify(
+                    classify,
+                    file_values=files_values,
+                    **classify_kwargs.get(classify, {})
+                )
+                classify_bar.update(1)
+
+            classify_results_DF = pd.DataFrame.from_dict(classify_results, orient='index')
+
+        # 保存结果到 session_state
+        st.session_state['classify_param_dict'] = classify_param_dict
+        st.session_state['classify_results'] = classify_results
+
+    else:
+
+        pass
+
+
+with classify_panel_file_detial:
+    # 直接用已有结果
+    st.dataframe(classify_results_DF)
 
 
 st.markdown("")
@@ -1531,14 +1716,172 @@ with summarize_panel_col:
     st.markdown("")
     st.markdown("")
     st.markdown("<h3 style='text-align: center;'>下载</h3>", unsafe_allow_html=True)
+
     st.markdown("---")
+    download_package_button = st.button("**封装页面数据**", use_container_width=True)
+    # hr_second(dark_color="#244690", height=2.1, light_color="#26519d")
+
+
+if st.session_state.get('download_dict', False):
+
+    download_dict = st.session_state['download_dict']
+
+else:
+
+    download_dict = {
+
+        'use_files_download': None,
+        'project_download': None,
+        'files_values_download': None,
+        'classify_download': None,
+    }
+
+
+if download_package_button:
+
+
+    download_dict = {
+
+        'use_files_download': use_files_download_zip(use_files_dict, content_type="files_pair"),
+        'project_download': None,
+        'files_values_download': pd.concat(list(use_values_dict.values()), axis=0).to_csv().encode('utf-8') if use_values_dict else None,
+        'classify_download':classify_results_DF.to_csv().encode('utf-8') if classify_results else None,
+    }
+
+    st.session_state['download_dict'] = download_dict
+    st.session_state['last_package_session'] = page_param_dict
+    st.rerun()
+
+with summarize_panel_col:
+
+    st.markdown("---")
+    left_download_col,download_sep, right_download_col = st.columns([1,.08, 1])
+    summarize_info_zone = st.container()
+    with left_download_col:
+        use_files_download_container = st.container()
+        project_download_container = st.container()
+
+    with right_download_col:
+        method_download_container = st.container()
+        classify_download_container = st.container()
+
+with st.spinner("正在封装"):
+
+    # 样本
+    with use_files_download_container:
+        st.markdown("")
+        use_files_download_cols = st.columns([1, .22])
+        st.markdown("---")
+
+    with use_files_download_cols[0]:
+
+        render_section_title("样本")
+
+    with use_files_download_cols[1]:
+
+        if download_dict['use_files_download']:
+
+            st.download_button(
+                label="🡇",
+                data=download_dict['use_files_download'],
+                file_name="use_files_download.zip",
+                mime="application/zip",
+                key="use_files_download_button"
+            )
+        else:
+
+            use_files_download_button = st.button("－", key="use_files_download_button")
+
+    # 项目
+    with project_download_container:
+        st.markdown("")
+        project_download_cols = st.columns([1, .22])
+        st.markdown("---")
+
+    with project_download_cols[0]:
+        render_section_title("项目")
+
+    with project_download_cols[1]:
+        project_download_button = st.button("🡇", key="project_download_button")
+
+
+    # 方法
+    with method_download_container:
+        st.markdown("")
+        method_download_cols = st.columns([1, .22])
+        st.markdown("---")
+
+    with method_download_cols[0]:
+        render_section_title("方法")
+
+    with method_download_cols[1]:
+
+        if download_dict['files_values_download']:
+
+            # 下载按钮
+            st.download_button(
+                label="🡇",
+                data=download_dict['files_values_download'],
+                file_name='files_values.csv',
+                mime='text/csv'
+            )
+
+        else:
+
+            use_files_download_button = st.button("－", key="use_values_download_button")
+
+
+    # 分类
+    with classify_download_container:
+        st.markdown("")
+        classify_download_cols = st.columns([1, .22])
+        st.markdown("---")
+
+    with classify_download_cols[0]:
+        render_section_title("分类")
+
+    with classify_download_cols[1]:
+
+        if download_dict['classify_download']:
+
+            # 下载按钮
+            st.download_button(
+                label="🡇",
+                data=download_dict['classify_download'],
+                file_name='classify_results.csv',
+                mime='text/csv'
+            )
+
+        else:
+
+            classify_download_button = st.button("－", key="classify_download_button")
+
+
+with summarize_info_zone:
+
+
+    if page_param_dict == st.session_state.get('last_package_session', False):
+
+        gui_success('当前页面为最新')
+
+    elif st.session_state.get('last_package_session', False):
+
+        gui_warning('⚠️ 页面有改动, 封装可能非最新')
+
+    else:
+
+        gui_info('未封装的页面')
+
+    st.markdown("---")
+
+
 
 with detail_panel[0]:
 
     render_section_title('Samples', font_size=20)
     with st.expander('samples', expanded=True):
         st.markdown('---')
-        display_detial_dict(file_param)
+        display_detial_dict(file_transfer_param)
         st.markdown('')
 
 with detail_panel[1]:
@@ -1569,64 +1912,50 @@ with detail_panel[3]:
 
 # 10 运行按钮前的 global 定义 ----------------------------------------------------------------------------------------------
 
-
 def del_cache():
 
-    def clean_dict(d):
-        return {
-            k: v for k, v in d.items()
-            if not isinstance(v, (np.ndarray, pd.DataFrame, DPLS))
-        }
+    state_to_save = {
+        k: v for k, v in st.session_state.items()
+        if not (
+                (isinstance(k, str) and (k.endswith('button') or k.endswith('dict')))
+                or isinstance(v, (np.ndarray, pd.DataFrame, DPLS))  # 若要包含 DPLS，添加到这个元组里
+        )
+    }
 
-    st.session_state = clean_dict(st.session_state)
-
-    if  'eg_created' in st.session_state:
-        del st.session_state['eg_created']
-
-    if "create_eg_kwargs" in st.session_state:
-        del st.session_state["create_eg_kwargs"]
-
-    if f"Cause_GUI_eg_created" in st.session_state:
-        del st.session_state["Cause_GUI_eg_created"]
-
-    if f"Cause_GUI_use_files_dict" in st.session_state:
-        del st.session_state["Cause_GUI_use_files_dict"]
-
-    if f"use_files_dict" in st.session_state:
-        del st.session_state["use_files_dict"]
-
-    if "Cause_GUI_clear_button" in st.session_state:
-        del st.session_state["Cause_GUI_clear_button"]
-        del st.session_state['classify_output_button']
-        del st.session_state['preprocess_output_button']
-        del st.session_state['method_output_button']
+    print('state_to_save', list(state_to_save.keys()))
 
 
-    if "add_x_b" in st.session_state:
-        del st.session_state["add_x_b"]
-        del st.session_state["minus_x_b"]
-        del st.session_state["add_xtox_b"]
-        del st.session_state["minus_xtox_b"]
+    if  'eg_created' in state_to_save:
+        del state_to_save['eg_created']
+
+    if "create_eg_kwargs" in state_to_save:
+        del state_to_save["create_eg_kwargs"]
+
+    if f"Cause_GUI_eg_created" in state_to_save:
+        del state_to_save["Cause_GUI_eg_created"]
+
+    return state_to_save
 
 
 # 项目文件记录器
+
 def save_project(project_folder_path: str, project_name: str):
 
     # 先删除缓存
-    del_cache()
+    run_project = del_cache()
+
+    print('run_project', list(run_project.keys()))
 
     if os.path.exists(project_folder_path):
         pass
     else:
         os.makedirs(project_folder_path)
 
-    run_project = st.session_state
-
     #添加一些版本信息
     run_project['input_project_name'] = project_name
     run_project['Version'] = now_version
 
-    print(f"Cause_GUI_seed_value", st.session_state.get('Cause_GUI_seed_value', None))
+    print(f"now_project_name_save_before", st.session_state.get('now_project_name', None))
 
     save_project_path = os.path.join(project_folder_path, f'{project_name}.json')
 
@@ -1654,330 +1983,8 @@ if save_project_button:
 #
 #         st.success(f"项目[{st.session_state['input_project_name']}]已载入")
 #
-# if project_input:
-#     with report_expander:
-#         st.success(f"项目{selected_project}已载入")
-
-
-# def project_transfer():
-#     # 预处理流程
-#     preprocess_project = {
-#         f"预处理步骤: {step}": preprocess_kwargs[step] for idx, step in enumerate(st.session_state.get("preprocess_selection", []), start=1)
-#     }
-#
-#     # 方法参数
-#     method_project = {
-#         f"分析方法: {method}": method_kwargs[method] for idx, method in enumerate(st.session_state.get("create_method_selection", []), start=1)
-#     }
-#
-#     # 分类参数
-#     classify_project = {
-#         f"分类方法: {clf}": classify_kwargs[clf] for idx, clf in enumerate(st.session_state.get("classify_selection", []), start=1)
-#         if clf != "All"
-#     }
-#
-#     # 合并所有参数
-#     all_project = {}
-#     all_project.update(file_param)
-#     all_project.update(preprocess_project)
-#     all_project.update(method_project)
-#     all_project.update(classify_project)
-#
-#     st.info(all_project)
-
-
-# # 11 运行按钮  -----------------------------------------------------------------------------------------------------------
-#
-#
-# if run_button:
-#
-#     st.sidebar.markdown("")
-#
-#     # 点击分析后立即存储本次项目
-#     del_cache()
-#     save_project(project_dir, f'last_run_project')
-#     st.info("本次运行项目已存储")
-#
-#     # 删除缓存
-#
-#     now_files_dict = copy.deepcopy(use_files_dict)
-#
-#     with title_bar:
-#
-#         # 插入 CSS 控制进度条外边距
-#         st.markdown("""
-#             <style>
-#             div[data-testid="stProgress"] {
-#                 margin-top: 0px;
-#             }
-#             </style>
-#         """, unsafe_allow_html=True)
-#
-#         render_dataset_title("总进度", font_size=20)
-#         # 添加带标签的进度条（Streamlit >= 1.25）
-#         title_bar_progress = st.progress(0)
-#
-#
-#     try:
-#
-#         # 分析方向控制
-#
-#         run_AB = methods_direction in ["AB", "AB&BA"]
-#         run_BA = methods_direction in ["BA", "AB&BA"]
-#
-#         # 数据选择
-#
-#         all_results = {}
-#
-#         if method_selection:
-#
-#             total_mission = (run_BA + run_AB) * (2*len(method_selection) + len(preprocess_selection)) * len(use_files_dict) + len(classify_selection)
-#             method_results = []
-#             file_causes = []
-#
-#             for db_dict in use_files_dict.copy().values():
-#
-#                 db_y = pd.DataFrame.from_dict(db_dict['files_cause'], orient='index')
-#                 file_causes.append(db_y)
-#
-#             y_df = pd.concat(file_causes, axis=0)
-#
-#             if run_AB:
-#
-#                 st.success("正在分析方向:AB")
-#
-#                 cal_values()
-#
-#                 AB_db_methods_results = []
-#
-#                 for db_dict in now_files_dict.values():
-#
-#                     AB_db_methods_results.append(db_dict['AB_pair_methods'])
-#
-#                 AB_methods_results = pd.concat(AB_db_methods_results, axis=0)
-#                 method_results.append(AB_methods_results)
-#
-#
-#             if run_BA:
-#
-#                 st.success("正在分析方向:BA")
-#
-#                 cal_values(reverse=True)
-#
-#                 BA_db_methods_results = []
-#
-#                 for db_dict in now_files_dict.values():
-#                     BA_db_methods_results.append(db_dict['BA_pair_methods'])
-#
-#                 BA_methods_results = pd.concat(BA_db_methods_results, axis=0)
-#                 method_results.append(BA_methods_results)
-#
-#             # 文件处理
-#
-#             # 汇总所有数据集, 所有方法的结果
-#             method_values_df = pd.concat(method_results, axis=1)
-#
-#             st.success(f"Methods 分析完成!")
-#             st.dataframe(method_values_df)
-#
-#             method_values_df_with_y = pd.concat([method_values_df, y_df], axis=1)
-#
-#             all_results[f'Values-results_{file_direction}.xlsx'] = method_values_df_with_y
-#
-#             if classify_selection:
-#
-#                 classify_results = {}
-#                 num_rows_with_nan = method_values_df_with_y.isna().any(axis=1).sum()
-#
-#                 if num_rows_with_nan > 0:
-#
-#                     if illegal_compatible_mode:
-#                         method_values_df_with_y = method_values_df_with_y.dropna(axis=0, how='any')
-#                         with report_expander:
-#                             st.warning(f"检测到[{num_rows_with_nan}]个非法样本, 已移除")
-#                         st.warning(f"检测到[{num_rows_with_nan}]个非法样本, 已移除")
-#                     else:
-#                         with report_expander:
-#                             st.warning(f"检测到[{num_rows_with_nan}]个非法样本, 若报错请尝试在[非法样本兼容模式]下分析")
-#                         st.warning(f"检测到[{num_rows_with_nan}]个非法样本, 若报错请尝试在[非法样本兼容模式]下分析")
-#
-#                 train_list, test_lit = spliter(method_values_df_with_y.shape[0],
-#                                                cv=classify_cv,
-#                                                mode=cv_mode,
-#                                                random_before=classify_shuffle_confirm,
-#                                                shuffle_seed=classify_shuffle_seed,
-#                                                )
-#
-#                 st.success('正在分类分析...')
-#
-#                 classify_bar = stqdm(classify_selection, total=len(classify_selection))
-#                 for classify in classify_selection:
-#                     classify_bar.set_description(f"正在执行:{classify}")
-#                     classify_result = do_classify(classify, file_values=method_values_df_with_y,
-#                                                   train_list=train_list, test_list=test_lit, **classify_kwargs.get(classify, {}))
-#                     classify_results[classify] = classify_result
-#                     classify_bar.update(1)
-#
-#
-#                 classify_results_df = pd.DataFrame.from_dict(classify_results, orient='index')
-#                 classify_results_df['Mean'] = classify_results_df.mean(axis=1)
-#                 st.success('Classify 分析完成!')
-#
-#                 # 完成后事项 ---------------------------------------------------------------------------------------------
-#
-#                 with report_expander:
-#                     st.success('Analysis completed')
-#                 st.dataframe(classify_results_df)
-#
-#                 classify_file_name = f"Classify-results_{file_direction}"
-#                 all_results[f"{classify_file_name}.xlsx"] = classify_results_df
-#
-#             zip_buffer = io.BytesIO()
-#
-#             with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
-#                 for filename, df in all_results.items():
-#                     # 每个 DataFrame 转换为 Excel 文件流
-#                     excel_buffer = io.BytesIO()
-#                     with pd.ExcelWriter(excel_buffer, engine='openpyxl') as writer:
-#                         df.to_excel(writer, index=True)
-#                     excel_buffer.seek(0)
-#                     # 将该 Excel 写入 zip 包
-#                     zip_file.writestr(filename, excel_buffer.read())
-#
-#             # 重要：把 ZIP 指针移到开头
-#             zip_buffer.seek(0)
-#
-#             # 下载按钮
-#             st.download_button(
-#                 label="📦 下载所有结果 (ZIP)",
-#                 data=zip_buffer,
-#                 file_name=f"File_{Database_print}_{method_print}_{classify_print}_all.zip",
-#                 mime="application/zip"
-#             )
-#
-#             st.markdown('本次运行项目已保存, 点击下载按钮将重置页面')
-#
-#         else:
-#
-#             total_mission = (len(preprocess_selection)*len(use_files_dict)) if len(preprocess_selection) > 0 else 1
-#             cal_values()
-#
-#         st.markdown('---')
-#         st.markdown("<h3 style='text-align: center;'>抽样读取面板</h3>", unsafe_allow_html=True)
-#         st.markdown('')
-#
-#         # 定义运行完毕后的抽样读取面板, 只能再定义一次, 复用 expand_raw_now_files() 位置会不对 -------------------------------------
-#
-#         with st.spinner('读取文件中...'):
-#
-#             with st.expander('抽样读取面板'):
-#
-#                 st.markdown('')
-#                 st.markdown('---')
-#
-#                 check_file_panel_raw, check_file_panel_sep2, check_file_panel_now, check_file_panel_3, check_file_panel_y = st.columns(
-#                     [1, 0.022, 1, 0.022, 0.6])
-#
-#                 with check_file_panel_raw:
-#
-#                     with st.expander('原始值', expanded=True):
-#                         # 文件列表标题
-#                         cols = st.columns([3, 4])
-#                         cols[0].markdown("<div style='text-align: left; margin-top: 30px; padding-left:10px;'>文件名</div>",
-#                                          unsafe_allow_html=True)
-#                         cols[1].markdown(
-#                             f"<div style='text-align: right; margin-top: 20px; padding-right: 20px;'> <span style='color: #55dd99; font-size:20px;'><strong>{total_file}</strong></span> files</div>",
-#                             unsafe_allow_html=True)
-#                         st.markdown("---")
-#
-#                         for db_name, db_values in use_files_dict.items():
-#
-#                             db_len = len(db_values["files_pair"])
-#
-#                             with st.expander(f'{db_name} | {db_len} files'):
-#
-#                                 for name, values in db_values["files_pair"].items():
-#                                     with st.expander(f'{name} | {values.shape}'):
-#                                         st.dataframe(values)
-#
-#                     st.markdown("---")
-#
-#                 with check_file_panel_now:
-#
-#                     with st.expander('Processed values', expanded=True):
-#                         # 文件列表标题
-#                         cols = st.columns([1.6, 4])
-#                         cols[0].markdown("<div style='text-align: left; margin-top: 30px; padding-left:10px;'>文件名</div>",
-#                                          unsafe_allow_html=True)
-#
-#                         cols[1].markdown(
-#                             f"<div style='text-align: right; margin-top: 27px; padding-right: 20px;'> <span style='font-size:15px;'>{preprocess_print}</span></div>",
-#                             unsafe_allow_html=True)
-#                         st.markdown("---")
-#
-#                         for db_name_, db_values_ in now_files_dict.items():
-#
-#                             db_len = len(db_values_["files_pair"])
-#
-#                             with st.expander(f'{db_name_} | {db_len} files'):
-#
-#                                 for name, values in db_values_["files_pair"].items():
-#                                     with st.expander(f'{name} | {values.shape}'):
-#                                         st.dataframe(values)
-#
-#                     st.markdown("---")
-#
-#                 with check_file_panel_y:
-#
-#                     with st.expander('Cause directions', expanded=True):
-#                         # 文件列表标题
-#                         cols = st.columns([4, 4])
-#
-#                         cols[0].markdown(
-#                             f"<div style='text-align: left; margin-top: 20px; padding-left: 20px;'> <span style='color: #4477dd; font-size:20px;'><strong>[{total_1}] </strong></span> A -> B</div>",
-#                             unsafe_allow_html=True)
-#
-#                         cols[1].markdown(
-#                             f"<div style='text-align: right; margin-top: 20px; padding-right: 20px;'> <span style='color: #dd4477; font-size:20px;'><strong>[{total_0}] </strong></span> B -> A</div>",
-#                             unsafe_allow_html=True)
-#                         st.markdown("---")
-#
-#                         for db_name, db_values in use_files_dict.items():
-#                             db_len = len(db_values["files_cause"])
-#
-#                             with st.expander(f'{db_name} | {db_len} files'):
-#                                 files_cause_df = pd.DataFrame.from_dict(db_values["files_cause"], orient='index')
-#
-#                                 st.dataframe(files_cause_df)
-#
-#                     st.markdown("---")
-#
-#         # base_dir = os.path.dirname(os.path.abspath(__file__))
-#         # temp_now_file_path = os.path.join(base_dir, 'temp_now_file')
-#         #
-#         # if os.path.exists(temp_now_file_path):
-#         #     pass
-#         # else:
-#         #     os.makedirs(temp_now_file_path)
-#         #
-#         # json_ready_dict = {
-#         #     key: df.to_dict(orient="records")  # 每个 DataFrame 转字典
-#         #     for key, df in now_files_dict.items()
-#         # }
-#         #
-#         # with open(rf'{temp_now_file_path}\last_now_file_record.json', 'w', encoding='utf-8') as f:
-#         #     json.dump(json_ready_dict, f, ensure_ascii=False, indent=4)
-#
-#
-#     except Exception as e:
-#
-#         with report_expander:
-#             st.error("❌ 分析出错, 详情见底部报告")
-#
-#         st.error(e)
-#         msg = traceback.print_exc()
-#         print(msg)
-
+if project_input:
+    st.toast(f'已读取项目: {selected_project[:-5]}')
 
 
 # 12 文件读取实现 ---------------------------------------------------------------------------------------------------------

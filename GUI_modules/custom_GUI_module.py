@@ -6,7 +6,7 @@ import plotly.graph_objects as go
 from joblib import Parallel, delayed
 from stqdm import stqdm
 from typing import Literal, Union, Callable
-from cause_pair_functions.DPLS_jj import DPLS
+from GUI_functions.DPLS_jj import DPLS
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
@@ -14,6 +14,9 @@ from sklearn.naive_bayes import GaussianNB
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.svm import SVC
 from sklearn.tree import DecisionTreeClassifier
+import io
+import zipfile
+import copy
 
 function_dict = {
     "线性函数": None,
@@ -91,7 +94,7 @@ DPLSR_param_dict = {
         "label": "Fit-矫正模式",
         "help": "[Fit]: 纯 Fit, [CV]: 纯 CV, [Fit_rectify]: CV 结果用 Fit 矫正",
         "options": ["Fit", 'CV', 'Fit_rectify'],
-        "value": "Fit_rectify"
+        "value": 'CV'
     },
 
     "distance_pattern": {
@@ -873,28 +876,49 @@ def param_controller(param_list: list, para_descriptions: dict, param_controls: 
     return params_kwargs
 
 
-
 # X-y 对数据生成器
-def return_cause_pair(not_pair_data: pd.DataFrame, prefix='', **kwargs):
+def return_cause_pair(not_pair_data: pd.DataFrame, relation: Literal["AB", "BA", "AB&BA"] = "AB", prefix='', **kwargs):
+    if relation == "AB&BA":
 
+        relation = ["AB", "BA"]
+    else:
+        relation = [relation]
 
     pair_data = []
     pair_name = []
     pair_cause = []
 
-    data_in_pair = [
-        pd.concat([pd.DataFrame(not_pair_data.iloc[:, i]), pd.DataFrame(not_pair_data.iloc[:, -1])], axis=1)
-        for i in range(not_pair_data.shape[1] - 1)]
+    for relation_ in relation:
 
-    data_in_pair_format = []
-    for pair in data_in_pair:
-        pair.columns = [0, 1]
-        data_in_pair_format.append(pair)
+        if relation_ == "AB":
+            data_in_pair = [
+                pd.concat([pd.DataFrame(not_pair_data.iloc[:, i]), pd.DataFrame(not_pair_data.iloc[:, -1])], axis=1)
+                for i in range(not_pair_data.shape[1] - 1)]
 
-    pair_data.extend(data_in_pair_format)
-    pair_name.extend(["AB_" + f"{prefix}[{str(col_name)}]" for col_name in not_pair_data.columns[:-1]])
+        elif relation_ == "BA":
 
-    pair_cause.extend([1] * len(data_in_pair))
+            data_in_pair = [
+                pd.concat([pd.DataFrame(not_pair_data.iloc[:, -1]), pd.DataFrame(not_pair_data.iloc[:, i])], axis=1)
+                for i in range(not_pair_data.shape[1] - 1)]
+
+        else:
+            raise AssertionError(f"return_cause_pair函数无法识别relation参数{relation_}")
+
+        data_in_pair_format = []
+        for pair in data_in_pair:
+            pair.columns = [0, 1]
+            data_in_pair_format.append(pair)
+
+        pair_data.extend(data_in_pair_format)
+        pair_name.extend([relation_ + f"_{prefix}[{str(col_name)}]" for col_name in not_pair_data.columns[:-1]])
+
+        if relation_ == "AB":
+
+            pair_cause.extend([1] * len(data_in_pair))
+
+
+        else:
+            pair_cause.extend([0] * len(data_in_pair))
 
     return pair_data, pair_name, pair_cause
 
@@ -973,6 +997,98 @@ def colorize_brackets_by_depth(expr: str) -> str:
 
     return result
 
+
+def gui_warning(text:str):
+    st.markdown(f"""
+        <style>
+        .custom-warning {{
+            text-align: center;
+            font-weight: 600;
+            font-size: 16px;
+            color: #333;
+            padding: 18px 18px;
+            margin: 10px 0;
+            border-radius: 7px;
+            border: 2.5px solid #f6c370;
+            background-color: transparent;
+            width: 100%;
+            box-sizing: border-box;
+        }}
+
+        @media (prefers-color-scheme: dark) {{
+            .custom-warning {{
+                color: #ccc;
+                border: 2.5px solid #9b8235;
+            }}
+        }}
+        </style>
+
+        <div class="custom-warning">
+            {text}
+        </div>
+    """, unsafe_allow_html=True)
+
+
+def gui_info(text:str):
+    st.markdown(f"""
+        <style>
+        .custom-info {{
+            text-align: center;
+            font-weight: 600;
+            font-size: 16px;
+            color: #333;
+            padding: 18px 18px;
+            margin: 10px 0;
+            border-radius: 7px;
+            border: 2.5px solid #244690;
+            background-color: transparent;
+            width: 100%;
+            box-sizing: border-box;
+        }}
+
+        @media (prefers-color-scheme: dark) {{
+            .custom-info {{
+                color: #ccc;
+                border: 2.5px solid #4066ca;
+            }}
+        }}
+        </style>
+
+        <div class="custom-info">
+            {text}
+        </div>
+    """, unsafe_allow_html=True)
+
+
+def gui_success(text:str):
+    st.markdown(f"""
+        <style>
+        .custom-success {{
+            text-align: center;
+            font-weight: 600;
+            font-size: 16px;
+            color: #555;
+            padding: 18px 18px;
+            margin: 10px 0;
+            border-radius: 7px;
+            border: 2px solid #88c09E;
+            background-color: transparent;
+            width: 100%;
+            box-sizing: border-box;
+        }}
+
+        @media (prefers-color-scheme: dark) {{
+            .custom-success {{
+                color: #ccc;
+                border: 2px solid #67AE6E;
+            }}
+        }}
+        </style>
+
+        <div class="custom-success">
+            {text}
+        </div>
+    """, unsafe_allow_html=True)
 
 # 实现括号上色的程序2
 def apply_colored_brackets(expr: str) -> str:
@@ -1076,6 +1192,43 @@ def display_detial_dict(d: dict, font_size: int = 16, font_weight: int = 315, ma
                 <span>&nbsp;&nbsp;None</span>
             </div>
         """, unsafe_allow_html=True)
+
+
+def use_files_download_zip(file_dict:dict, content_type="files_pair"):
+    """
+    将多个文件打包成 ZIP 并返回字节对象。
+
+    参数:
+        file_dict (dict): {文件名: 文件字节内容}
+        zip_name (str): ZIP 文件名（可选，默认 "download.zip"）
+
+    返回:
+        bytes: ZIP 文件的字节内容
+    """
+
+    if file_dict:
+
+        zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+
+            for data_name, features in file_dict.items():
+
+                for feature_name, df in features[f'{content_type}'].items():
+
+                    # 转成 CSV（不保存到磁盘，直接写入内存）
+                    csv_bytes = df.to_csv(index=False).encode("utf-8")
+                    # 文件路径为: data_name/feature_name.csv
+                    zf.writestr(f"{data_name}/{feature_name}.csv", csv_bytes)
+
+        # 将指针移动到开头
+        zip_buffer.seek(0)
+        return zip_buffer.getvalue()
+
+    else:
+
+        return None
+
+
 
 # 带下划线的副标题
 def render_section_title(
@@ -1202,8 +1355,8 @@ def hr_second(height=2, dark_color="#ffffff", light_color="#000000", left_px=0, 
     )
 
 
-def expand_raw_now_files(raw: dict, total_file, thread=1, expand=True, print_pred=False, block_id="test",
-                         checking_file:str | None = None, description_type:Literal['latex', 'str'] = 'str'):
+def single_workspace(raw: dict, total_file, thread=1, expand=True, print_pred=False, block_id="test",
+                     checking_file:str | None = None, description_type:Literal['latex', 'str'] = 'str'):
 
 
     check_file_panel = st.columns([1.35, 3])
@@ -1213,7 +1366,7 @@ def expand_raw_now_files(raw: dict, total_file, thread=1, expand=True, print_pre
         check_file_panel_2_expander = st.expander("File Details", expanded=expand)
 
 
-    def click_and_show(db_values):
+    def a_single_workspace(db_values):
 
         if print_pred:
 
@@ -1343,7 +1496,7 @@ def expand_raw_now_files(raw: dict, total_file, thread=1, expand=True, print_pre
 
             for db_name, db_values in raw.items():
 
-                if st.button(f'{db_name}', key=f"{block_id}-{db_name}", use_container_width=True):
+                if st.button(f'{db_name}', key=f"{block_id}-{db_name}-button", use_container_width=True):
 
                     checking_file = db_name
 
@@ -1354,7 +1507,6 @@ def expand_raw_now_files(raw: dict, total_file, thread=1, expand=True, print_pre
 
 
             with check_file_panel_2_expander:
-
 
                 if raw[checking_file].get('description', False):
 
@@ -1383,9 +1535,330 @@ def expand_raw_now_files(raw: dict, total_file, thread=1, expand=True, print_pre
 
                 st.markdown("---")
 
-                click_and_show(raw[checking_file])
+                a_single_workspace(raw[checking_file])
 
             return checking_file
 
 
+def fusion_workspace(raw, block_id, thread, total_file, checking_file:str | None = None, description_type:Literal['latex', 'str'] = 'str', ):
 
+
+    check_file_panel = st.columns([1.35, 3])
+
+    with check_file_panel[1]:
+
+        check_file_panel_2_expander = st.expander("File Details", expanded=True)
+
+
+    def a_fusion_workspace(X, y, checking=None):
+
+        if X is None or y is None:
+
+            return 0
+
+        print("a_fusion_workspace_SHAPE", X.shape, y.shape)
+
+        # 使用 expander 创建一个可折叠/展开的区域
+        DPLSR_param_dict_ = DPLSR_param_dict.copy()
+
+        DPLS_kwargs = param_controller(
+            param_list=['DPLSR'],
+            para_descriptions={'DPLSR': method_descriptions.get('DPLSR')},
+            param_controls={"DPLSR": DPLSR_param_dict_},
+            desc='方法',
+            a_copied_dict=f"{block_id}", expanded=False,
+        )
+        if not DPLS_kwargs['DPLSR']["distance_pattern"]:
+            DPLS_kwargs['DPLSR']["distance_pattern"] = ['Euc']
+
+        DPLS_kwargs['checking'] = checking
+
+        plot_expander = st.expander('fusion_workspace', expanded=True)
+
+        with plot_expander:
+
+            plot_sep_0, plot_P_col, plot_sep_1, plot_sep_3, plot_DPLSR_col = st.columns(
+                [.01, 4, .2, 1.6, 2])
+
+            st.markdown("---")
+
+        x_picked_eg = list(X.columns)
+
+        with plot_P_col:
+
+            enforce_P_col, x_num_col = st.columns([1, 1])
+
+            with enforce_P_col:
+
+                enforce_P = st.slider("硬定位的 P: ", min_value=-1, max_value=DPLS_kwargs['DPLSR']['max_iter'] - 1,
+                                      value=-1, key=f'{block_id}_enforce_P')
+
+            with x_num_col:
+
+                x_selected = st.multiselect("使用的 X: ", options=['All'] + x_picked_eg, key=f'{block_id}_x_num',
+                                            default=['All'])
+
+                if f"All" in x_selected:
+                    x_selected = x_picked_eg
+
+                if not x_selected:
+                    x_selected = x_picked_eg
+
+                DPLS_kwargs['x_num'] = x_selected
+
+                x_eg_use = copy.deepcopy(X)[x_selected]
+
+        with st.spinner("正在拟合..."):
+            # 检测 dpls 参数是否被改动过
+            if f"{block_id}_eg_created" not in st.session_state:
+
+                st.session_state[f"{block_id}_dpls_kwargs"] = DPLS_kwargs
+                pred_obj = DPLS(**DPLS_kwargs["DPLSR"]).fit(x_eg_use[x_selected].copy(), y,
+                                                            **DPLS_kwargs["DPLSR"])
+                st.session_state[f'{block_id}_pred_obj'] = pred_obj
+                dpls_change = False
+
+            else:
+
+                dpls_change = (st.session_state.get(f"{block_id}_dpls_kwargs", None) != DPLS_kwargs)
+                st.session_state[f"{block_id}_dpls_kwargs"] = DPLS_kwargs
+
+                if dpls_change:
+
+                    pred_obj = DPLS(**DPLS_kwargs["DPLSR"]).fit(x_eg_use[x_selected].copy(), y,
+                                                                **DPLS_kwargs["DPLSR"])
+                    st.session_state[f'{block_id}_pred_obj'] = pred_obj
+
+                else:
+                    pred_obj = st.session_state[f'{block_id}_pred_obj']
+
+            st.session_state[f'{block_id}_eg_created'] = True
+
+        with plot_sep_3:
+            if DPLS_kwargs["DPLSR"]["R_mode"] == 'single':
+                pass
+            else:
+
+                st.markdown("<div style='height:0px'></div>", unsafe_allow_html=True)
+                st.markdown(
+                    f"""
+                    <h3 style='text-align: right; font-size: 28px; font-weight: bold;'>
+                        P: 
+                        <span style='color: #3580f5; font-size: 30px; font-weight: bold;'>
+                            {pred_obj.p[0] if enforce_P == -1 else enforce_P}
+                        </span>
+                    </h3>
+                    """,
+                    unsafe_allow_html=True
+                )
+
+        with plot_DPLSR_col:
+            if DPLS_kwargs["DPLSR"]["R_mode"] == 'single':
+                pass
+            else:
+                st.markdown("<div style='height:0px'></div>", unsafe_allow_html=True)
+                st.markdown(
+                    f"""
+                    <h3 style='text-align: right; font-size: 28px; font-weight: bold;'>
+                        DPLSR: 
+                        <span style='color: #3580f5; font-size: 30px; font-weight: bold;'>
+                            {pred_obj.R2[0] if enforce_P == -1 else pred_obj.y_pred_R2[0][enforce_P] :.2f}
+                        </span>
+                    </h3>
+                    """,
+                    unsafe_allow_html=True
+                )
+
+        # 定义两列
+
+        with plot_expander:
+
+            cols = st.columns(2)
+
+        fig_dict = {}
+        # 创建一个空图
+
+        for idx, x_i in enumerate(x_selected):
+
+            x = list(x_eg_use.columns).index(x_i)
+
+            if enforce_P == -1:
+
+                if DPLS_kwargs["DPLSR"]["R_mode"] == 'single':
+
+                    y_pred = pred_obj.y_pred[x]
+
+                    R = pred_obj.R2[x]
+                    P = pred_obj.p[x]
+
+                else:
+
+                    y_pred = pred_obj.y_pred[0]
+
+                    R = pred_obj.R2[0]
+                    P = pred_obj.p[0]
+
+            else:
+
+                if DPLS_kwargs["DPLSR"]["R_mode"] == 'single':
+
+                    y_pred = pred_obj.y_preds[x][:, enforce_P]
+                    R = pred_obj.y_pred_R2[x][enforce_P]
+
+                else:
+
+                    y_pred = pred_obj.y_preds[0][:, enforce_P]
+                    R = pred_obj.y_pred_R2[0][enforce_P]
+
+                P = enforce_P
+
+            x_eg_use_i = pd.DataFrame()
+            x_eg_use_i[x_i] = pred_obj.X.copy()[:, x]
+
+            x_eg_use_i['y'] = y
+            x_eg_use_i['preds'] = y_pred  # 使用完整预测值
+
+            fig = go.Figure()
+            # 添加 y_exp（蓝色），优先添加以保证 preds 最上层
+
+            fig.add_scatter(
+                x=x_eg_use_i[x_i],
+                y=x_eg_use_i['y'],
+                mode='markers',
+                name='y_exp',
+                marker=dict(
+                    color='#3580F5',
+                    size=6,
+                    opacity=0.75
+                )
+            )
+
+            # 最后添加 preds（橙色），确保在最上层
+            fig.add_scatter(
+                x=x_eg_use_i[x_i],
+                y=x_eg_use_i['preds'],
+                mode='markers',
+                name='preds',
+                marker=dict(
+                    color='#FFB420',
+                    size=4.5,
+                    opacity=0.82
+                )
+            )
+
+            # 更新坐标轴标签
+            fig.update_layout(
+                xaxis_title=x_i,
+                yaxis_title=f'y',
+                legend=dict(
+                    traceorder="normal"  # 图例顺序按添加顺序排列
+                )
+            )
+
+            # 更新布局
+            fig.update_layout(
+                title=dict(
+                    text=f"[x_{x_selected.index(x_i) + 1}] [P: {P}] [R: {R:.2f}]",
+                    x=0.55,  # 居中，可调
+                    xanchor='right',
+                    font=dict(size=19),
+                ),
+                showlegend=False,
+                height=430,
+                margin=dict(t=40, b=10, l=7, r=10),
+                paper_bgcolor='rgba(0,0,0,0)',
+                plot_bgcolor='rgba(0,0,0,0)',
+                xaxis=dict(showgrid=False, zeroline=False, showline=False, ticks='', showticklabels=True),
+                yaxis=dict(showgrid=False, zeroline=False, showline=False, ticks='', showticklabels=True)
+            )
+
+            with cols[idx % 2]:
+                st.plotly_chart(fig, use_container_width=True, key=f"{block_id}_{x_i}create_plotly_chart")
+
+            fig_dict[f"plots_{x_i}"] = fig
+
+        create_check_file_expander = st.expander("检视预览函数样本", expanded=True)
+        with create_check_file_expander:
+            formula_x_col, formula_check_file_sep, formula_y_col = st.columns([.738, 0.025, .382])
+
+            with formula_x_col:
+                st.markdown("")
+                st.markdown("")
+                render_section_title("来自数据的自变量:")
+
+                with st.expander(f"**{X.shape}**", expanded=False):
+                    st.markdown("---")
+                    st.dataframe(x_eg_use.copy(), height=795, hide_index=True)
+
+            with formula_y_col:
+                st.markdown("")
+                st.markdown("")
+
+                render_section_title("因变量")
+                with st.expander(f"**{y.shape}**",
+                                 expanded=False):
+                    st.markdown("---")
+                    st.dataframe(y, height=795, hide_index=True)
+
+
+    with check_file_panel[0]:
+
+        with st.expander("", expanded=True):
+
+            # 文件列表标题
+            raw_x_cols = st.columns([3, 4])
+            raw_x_cols[0].markdown(
+                "<div style='text-align: left; margin-top: 30px; padding-left:10px;'>文件名</div>",
+                unsafe_allow_html=True)
+            raw_x_cols[1].markdown(
+                f"<div style='text-align: right; margin-top: 23px; padding-right: 20px;'> <span style='color: #55dd99; font-size:20px;'><strong>{total_file}</strong></span> files</div>",
+                unsafe_allow_html=True)
+
+            st.markdown("---")
+
+            for db_name, db_values in raw.items():
+
+                if st.button(f'{db_name}', key=f"{block_id}-{db_name}-button", use_container_width=True):
+
+                    checking_file = db_name
+
+
+            if not checking_file:
+
+                checking_file = db_name
+
+
+            with check_file_panel_2_expander:
+
+                if raw[checking_file].get('description', False):
+
+                    db_description = raw[checking_file]['description']
+
+                else:
+
+                    db_description = "No description"
+
+                if description_type == 'latex':
+
+                    latex_expr = apply_colored_brackets(db_description)
+                    st.latex(latex_expr)
+
+                else:
+
+                    raw_y_cols = st.columns([2, 6.6])
+
+                    raw_y_cols[1].markdown(
+                        f"<div style='text-align: right; margin-top: 20px; padding-right: 20px; font-weight:400;'>{db_description}</div>",
+                        unsafe_allow_html=True)
+
+                    raw_y_cols[0].markdown(
+                        f"<div style='text-align: left; margin-top: 20px; padding-left: 20px;'> <strong>[{checking_file}] </strong></div>",
+                        unsafe_allow_html=True)
+
+                st.markdown("---")
+
+                a_fusion_workspace(X = raw[checking_file].get("X", None), y = raw[checking_file].get("y", None), checking=checking_file)
+
+            print("checking_file", checking_file)
+
+            return checking_file

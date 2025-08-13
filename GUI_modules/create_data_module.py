@@ -1,14 +1,10 @@
-import streamlit as st
-import pandas as pd
-import numpy as np
-from typing import Literal, Union
 
-from custom_html_module import *
+
+from GUI_modules.custom_GUI_module import *
 import io
 import zipfile
-import time
-from cause_pair_functions.muti_func_test import gen_y_exp
-from cause_pair_functions.DPLS_jj import DPLS
+from GUI_functions.muti_func_test import gen_y_exp
+from GUI_functions.DPLS_jj import DPLS
 import copy
 import plotly.graph_objects as go
 import plotly.io as pio
@@ -20,33 +16,14 @@ import random
 st.set_page_config(layout="wide")
 
 
-@st.cache_data(show_spinner=False)
-def export_multiple_plots_to_zip(fig_dict: dict[str, go.Figure]) -> bytes:
-    """
-    将多个 Plotly 图像导出为 PNG，并打包为 ZIP。
-
-    参数:
-        fig_dict: 一个字典，键为文件名，值为 plotly 图对象
-
-    返回:
-        bytes: zip 文件的字节内容
-    """
-    zip_buffer = io.BytesIO()
-
-    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
-        for filename, fig in fig_dict.items():
-            img_bytes = pio.to_image(fig, format="png", width=800, height=600, scale=2)
-            zip_file.writestr(f"{filename}.png", img_bytes)
-
-    zip_buffer.seek(0)
-    return zip_buffer.read()
-
 # 7-2-2 与 本地文件模式共用的功能部分 --------------------------------------------------------------------------------
 
 # 模拟样本的独立功能区, 单独于 host_panel_check_file 外 -------------------------------------------------------------------------
 
-def simplify_data_module(block_id, thread=1):
-    
+def create_data(block_id, thread=1):
+
+    file_param = {}
+
     hr_second(dark_color="#244690", height=2, light_color="#26519d")
     
     # 7-2-3 定义生成模拟数据的控制面板 ---------------------------------------------------------------------------------------
@@ -152,12 +129,12 @@ def simplify_data_module(block_id, thread=1):
         st.session_state[f'{block_id}_minus_xtox'] = False
     
         with add_x_col:
-            add_x = st.button("＋", key=f"{block_id}_add_x_b")
+            add_x = st.button("＋", key=f"{block_id}_add_x_button")
             if add_x:
                 st.session_state[f"{block_id}_add_x"] = True
     
         with minus_x_col:
-            minus_x = st.button("－", key=f"{block_id}minus_x_b")
+            minus_x = st.button("－", key=f"{block_id}_minus_x_button")
             if minus_x:
                 st.session_state[f"{block_id}_minus_x"] = True
     
@@ -176,11 +153,11 @@ def simplify_data_module(block_id, thread=1):
         with formular_title_add_xtox:
             render_noline_title("快速添加一个互作项")
         with add_xtox_col:
-            add_xtox = st.button("＋", key=f"{block_id}_add_xtox_b")
+            add_xtox = st.button("＋", key=f"{block_id}_add_xtox_button")
             if add_xtox:
                 st.session_state[f"{block_id}_add_xtox"] = True
         with minus_xtox_col:
-            minus_xtox = st.button("－", key=f"{block_id}_minus_xtox_b")
+            minus_xtox = st.button("－", key=f"{block_id}_minus_xtox_button")
             if minus_xtox:
                 st.session_state[f"{block_id}_minus_xtox"] = True
 
@@ -190,7 +167,7 @@ def simplify_data_module(block_id, thread=1):
             with formular_sep_3_col2:
                 formular_name = st.text_input("存储此函数", placeholder="存储此配置", label_visibility="collapsed", key=f"{block_id}_formular_eg_name")
             with formular_sep_3_col3:
-                st.button("⏬", key=f"{block_id}_formular_eg_name_button", use_container_width=True)
+                st.button("💾", key=f"{block_id}_formular_eg_name_button", use_container_width=True)
     
     with create_func_control_panel_expander:
 
@@ -421,7 +398,7 @@ def simplify_data_module(block_id, thread=1):
                                                               )
     
                     else:
-                        create_xtox_num = st.number_input("互作项数量", min_value=create_xtox_limit, max_value=10, step=0, value=0,
+                        create_xtox_num = st.number_input("互作项数量", min_value=create_xtox_limit, max_value=10, step=0, value=2,
                                                           key=f"{block_id}_create_xtox_num",
                                                           help=create_help_dict.get("create_xtox_num", "无描述"),
                                                           )
@@ -465,7 +442,7 @@ def simplify_data_module(block_id, thread=1):
     
                     else:
     
-                        create_funcseed = st.number_input("f(x)随机种子", min_value=0, max_value=20000, step=1, value=73, key=f"{block_id}_create_funcseed",
+                        create_funcseed = st.number_input("f(x)随机种子", min_value=0, max_value=20000, step=1, value=74, key=f"{block_id}_create_funcseed",
                                                        help=create_help_dict.get("create_funcseed", "无描述"),
                                                        )
                         st.session_state[f"{block_id}_formular_refresh"] = False
@@ -676,9 +653,6 @@ def simplify_data_module(block_id, thread=1):
         st.markdown('')
         st.markdown('')
         st.markdown('')
-        st.markdown('')
-        st.markdown('')
-
 
 
         # 7-5-4 打印公式的latex格式 ---------------------------------------------------------------------------------------
@@ -697,11 +671,17 @@ def simplify_data_module(block_id, thread=1):
         st.markdown('')
         st.markdown('')
         st.markdown('')
-        st.markdown("")
-        st.markdown("")
-        st.markdown("")
+        st.markdown('')
         st.markdown('')
         st.markdown("<div style='height:27px'></div>", unsafe_allow_html=True)
+
+        create_check_file_expander = st.expander("检视预览函数样本", expanded=False)
+
+        created_data = {}
+        total_0 = 0
+        total_1 = 0
+        total_file = 0
+
         hr_second(dark_color="#244690", height=2.5, light_color="#26519d")
     
     # 独立与互作特征鉴别器(待升级)
@@ -766,7 +746,6 @@ def simplify_data_module(block_id, thread=1):
     
             with create_exe_expander_2:
 
-
                 st.markdown("---")
 
                 col_file_num, col_test_seed = st.columns([1, 1])
@@ -776,7 +755,7 @@ def simplify_data_module(block_id, thread=1):
                         "生成类似函数的个数",
                         min_value=10,
                         max_value=10000,
-                        value=20,
+                        value=10,
                         step=10
                         , key=f"{block_id}_test_files_num")
     
@@ -825,8 +804,6 @@ def simplify_data_module(block_id, thread=1):
                             step=1
                             , key=f"{block_id}_gen_floor")
 
-                st.markdown("---")
-
                 create_noise = st.slider("y_obs 噪音强度域", min_value=0.0, max_value=5.0, step=0.05, value=(0.05, 0.5),
                                          key=f"{block_id}_create_noise",
                                          help="生成模拟样本后, 往[期望值y_exp]添加的噪音强度"
@@ -834,31 +811,11 @@ def simplify_data_module(block_id, thread=1):
 
                 thresh_range = st.slider("样本数限制在", 0, 10000, (100, 1500), key=f"{block_id}_thresh_range", step=100)
 
-                st.markdown("<div style='height:41px'></div>", unsafe_allow_html=True)
+                relation = st.selectbox('输出方向', options=['AB&BA', 'AB', 'BA'], key=f"{block_id}_relation",)
+
+                st.markdown("<div style='height:22px'></div>", unsafe_allow_html=True)
 
                 output_create_button = st.button("**推送到项目**", use_container_width=True, key=f"{block_id}_output_create_button")
-
-
-            # DPLS_attr_dict = DPLS().__dict__.copy()
-            # DPLS_needed_param = ["cv", "max_iter", "R2", "cv_R2", "fit_R2", "p", "cv_p", "fit_p", "y_pred_R2", "square"]
-            # DPLS_attr_dict = {k: v for k, v in DPLS_attr_dict.items() if k in DPLS_needed_param}
-            #
-            # with st.expander("**选择需要的 DPLS 属性**", expanded=True):
-            #
-            #     analys_direction = st.selectbox("属性方向", ["X - y", "y - X", "X - y&y - X"],
-            #                                     key=f"{block_id}_analys_direction")
-            #     analys_direction = direction_transform[analys_direction]
-            #
-            #     DPLS_attr_col = st.columns([1.32, 1])
-            #
-            #     DPLS_picked_attr = {}
-            #
-            #     for idx, key in enumerate(DPLS_attr_dict.keys()):
-            #
-            #         with DPLS_attr_col[idx % 2]:
-            #             DPLS_picked_attr[key] = st.checkbox(f"{key}", value=False, key=f"{block_id}_DPLS_needed_attr_{key}")
-            #
-            # DPLS_picked_attr = {key:value for key, value in DPLS_picked_attr.items() if value}
 
 
     with create_preview_panel:
@@ -869,14 +826,32 @@ def simplify_data_module(block_id, thread=1):
         st.markdown("")
     
     
-        plot_sep_0, plot_P_col, plot_sep_1,plot_addnoise_col, plot_sep_4, plot_y_exp_col, plot_sep_2, plot_y_obs_col, plot_sep_3, plot_DPLSR_col, plot_PrsR_col = st.columns(
-            [.01, 1.3,.2,1.3,.2,.5,.2, .5, 1.2, 1.05, .9])
+        plot_sep_0, plot_P_col, plot_addnoise_col, plot_y_exp_col, plot_y_obs_col, plot_sep_3, plot_DPLSR_col, plot_PrsR_col = st.columns(
+            [.01, 2, 1, .6, .6, .7, 1.0, .85])
     
     
         with plot_P_col:
-    
-            enforce_P = st.slider("硬定位的 P: ", min_value=-1, max_value=DPLS_kwargs['DPLSR']['max_iter'] - 1,
-                                  value=-1, key=f'{block_id}_enforce_P')
+
+            x_num_col, enforce_P_col = st.columns([1,1])
+
+            with enforce_P_col:
+
+                enforce_P = st.slider("硬定位的 P: ", min_value=-1, max_value=DPLS_kwargs['DPLSR']['max_iter'] - 1,
+                                      value=-1, key=f'{block_id}_enforce_P')
+
+            with x_num_col:
+
+                x_selected = st.multiselect("使用的 X: ", options=['All'] + x_picked_eg, key=f'{block_id}_x_num', default=['All'])
+
+                if f"All" in x_selected:
+                    x_selected = x_picked_eg
+
+                if not x_selected:
+                    x_selected = x_picked_eg
+
+                DPLS_kwargs['x_num'] = x_selected
+
+                x_eg_use = copy.deepcopy(x_eg)[x_selected]
     
         with plot_addnoise_col:
     
@@ -892,7 +867,30 @@ def simplify_data_module(block_id, thread=1):
             y_df_eg = pd.DataFrame()
             y_df_eg["y_exp"] = y_exp_eg
             y_df_eg["y_obs"] = y_obs_eg
-    
+
+            with create_check_file_expander:
+                formula_x_col, formula_check_file_sep, formula_y_col = st.columns([.738, 0.025, .382])
+
+                with formula_x_col:
+                    st.markdown("")
+                    st.markdown("")
+                    render_section_title("来自函数的自变量:")
+
+                    with st.expander(f"**{x_eg.shape}**", expanded=True):
+                        st.markdown("---")
+                        st.dataframe(x_eg_use.copy(), height=795, hide_index=True)
+
+                with formula_y_col:
+                    st.markdown("")
+                    st.markdown("")
+
+                    render_section_title("因变量")
+                    with st.expander(f"**{y_df_eg.shape}** | PersonR^2 = {calculate_corr(y_exp_eg, y_obs_eg)[0]:.3f}",
+                                     expanded=True):
+                        st.markdown("---")
+                        st.dataframe(y_df_eg, height=795, hide_index=True)
+
+
         with plot_y_exp_col:
             st.markdown("")
             st.markdown("<div style='height:18px'></div>", unsafe_allow_html=True)
@@ -903,21 +901,20 @@ def simplify_data_module(block_id, thread=1):
             st.markdown("")
             st.markdown("<div style='height:18px'></div>", unsafe_allow_html=True)
             print_obs = st.checkbox('y_obs', value=False, key=f'{block_id}_print_obs')
-    
+
         st.markdown("")
         st.markdown("")
         st.markdown("")
         st.markdown('')
-        st.markdown("")
         st.markdown('')
-    
+
         with st.spinner("正在拟合..."):
 
             # 检测 dpls 参数是否被改动过
             if f"{block_id}_eg_created" not in st.session_state:
 
                 st.session_state[f"{block_id}_dpls_kwargs"] = DPLS_kwargs
-                pred_obj = DPLS(**DPLS_kwargs["DPLSR"]).fit(x_eg_use.copy(), y_df_eg['y_obs'].copy(), **DPLS_kwargs["DPLSR"])
+                pred_obj = DPLS(**DPLS_kwargs["DPLSR"]).fit(x_eg_use[x_selected].copy(), y_df_eg['y_obs'].copy(), **DPLS_kwargs["DPLSR"])
                 st.session_state[f'{block_id}_pred_obj'] = pred_obj
                 dpls_change = False
 
@@ -928,7 +925,7 @@ def simplify_data_module(block_id, thread=1):
 
                 if dpls_change or eg_change:
 
-                    pred_obj = DPLS(**DPLS_kwargs["DPLSR"]).fit(x_eg_use.copy(), y_df_eg['y_obs'].copy(),**DPLS_kwargs["DPLSR"])
+                    pred_obj = DPLS(**DPLS_kwargs["DPLSR"]).fit(x_eg_use[x_selected].copy(), y_df_eg['y_obs'].copy(),**DPLS_kwargs["DPLSR"])
                     st.session_state[f'{block_id}_pred_obj'] = pred_obj
 
                 else:
@@ -999,14 +996,12 @@ def simplify_data_module(block_id, thread=1):
                     )
 
 
-
-
         # 定义两列
         cols = st.columns(2)
         fig_dict = {}
         # 创建一个空图
     
-        for idx, x_i in enumerate(x_picked_eg):
+        for idx, x_i in enumerate(x_selected):
     
             x = list(x_eg_use.columns).index(x_i)
     
@@ -1127,175 +1122,94 @@ def simplify_data_module(block_id, thread=1):
             fig_dict[f"plots_{x_i}"] = fig
 
 
-    create_check_file_sep, create_check_file_col = st.columns([0.001, 1])
-    
-    with create_check_file_col:
+    if output_create_button and not(eg_change or dpls_change):
 
-        create_check_file_expander = st.expander("检视预览函数样本", expanded=False)
+        print("run_created")
+        file_param[f'{block_id}_pushed_create'] = True
 
-        with create_check_file_expander:
-            formula_x_col, formula_check_file_sep, formula_y_col = st.columns([.738, 0.025, .382])
+        with st.spinner('正在生模拟数据...'):
 
-            with formula_x_col:
-                st.markdown("")
-                st.markdown("")
-                render_section_title("来自函数的自变量:")
+            create_times = test_files_num
 
-                with st.expander(f"**{x_eg.shape}**", expanded=True):
-                    st.markdown("---")
-                    st.dataframe(x_eg_use.copy(), height=795, hide_index=True)
+            create_func_seeds = gen_seed(create_times, rand_seed=create_funcseed, gen_times=1)[0]
+            create_x_seeds = gen_seed(create_times, rand_seed=create_xseed, gen_times=1)[0]
 
-            with formula_y_col:
-                st.markdown("")
-                st.markdown("")
+            noise_step = (create_noise[1] - create_noise[0]) / gen_floor
+            create_noise_thresh = [(create_noise[0] + i * noise_step, create_noise[0] + (i + 1) * noise_step) for i
+                                   in range(gen_floor)]
 
-                render_section_title("因变量")
-                with st.expander(f"**{y_df_eg.shape}** | PersonR^2 = {calculate_corr(y_exp_eg, y_obs_eg)[0]:.3f}",
-                                 expanded=True):
-                    st.markdown("---")
-                    st.dataframe(y_df_eg, height=795, hide_index=True)
+            for create_i in stqdm(range(create_times)):
 
-        created_data = {}
-        total_0 = 0
-        total_1 = 0
-        total_file = 0
+                np.random.seed(create_func_seeds[create_i])
 
-        if output_create_button and not(eg_change or dpls_change):
+                create_kwargs["func_seed"] = create_func_seeds[create_i]
+                create_kwargs["x_seed"] = create_x_seeds[create_i]
 
-            print("run_created")
+                eg_create_samples = np.random.randint(thresh_range[0], thresh_range[1])
 
-            with st.spinner('正在生模拟数据...'):
+                # 7-4-1 参数选择完毕, 开始生成模拟数据 ----------------------------------------------------------------------
 
-                create_times = test_files_num // (create_use_x_num + create_xtox_num)
+                x_create, X_create, y_exp_create, x_picked_create = gen_y_exp(sample_num=eg_create_samples,
+                                                                              **create_kwargs)
+                np.random.seed(create_x_seeds[create_i])
 
-                create_func_seeds = gen_seed(create_times, rand_seed=create_funcseed, gen_times=1)[0]
-                create_x_seeds = gen_seed(create_times, rand_seed=create_xseed, gen_times=1)[0]
+                create_noise_i = random.uniform(*create_noise_thresh[create_i % gen_floor])
+                y_obs_create = y_exp_create + np.random.normal(size=y_exp_create.shape[0], loc=0,
+                                                               scale=y_exp_create.std() * create_noise_i)
+                create_R_true = calculate_corr(y_exp_create, y_obs_create)[0]
 
-                noise_step = (create_noise[1] - create_noise[0]) / gen_floor
-                create_noise_thresh = [(create_noise[0] + i * noise_step, create_noise[0] + (i + 1) * noise_step) for i
-                                       in range(gen_floor)]
+                create_func_name = 'y=' + '+'.join(list(X_create)) + f'[s-{create_func_seeds[create_i]}]'
 
-                for create_i in stqdm(range(create_times)):
+                if use_x_piked:
 
-                    np.random.seed(create_func_seeds[create_i])
+                    create_i_use = copy.deepcopy(x_create)[x_picked_create]
 
-                    create_kwargs["func_seed"] = create_func_seeds[create_i]
-                    create_kwargs["x_seed"] = create_x_seeds[create_i]
+                else:
+                    create_i_use = x_create.copy()
 
-                    eg_create_samples = np.random.randint(thresh_range[0], thresh_range[1])
+                if relation == "AB&BA":
+                    x_times = 2
+                else:
+                    x_times = 1
 
-                    # 7-4-1 参数选择完毕, 开始生成模拟数据 ----------------------------------------------------------------------
+                create_i_pair = create_i_use.copy()
+                create_i_pair["y"] = y_obs_create
 
-                    x_create, X_create, y_exp_create, x_picked_create = gen_y_exp(sample_num=eg_create_samples,
-                                                                                  **create_kwargs)
-                    np.random.seed(create_x_seeds[create_i])
+                print("y_obs_create", len(y_obs_create))
 
-                    create_noise_i = random.uniform(*create_noise_thresh[create_i % gen_floor])
-                    y_obs_create = y_exp_create + np.random.normal(size=y_exp_create.shape[0], loc=0,
-                                                                   scale=y_exp_create.std() * create_noise_i)
-                    create_R_true = calculate_corr(y_exp_create, y_obs_create)[0]
+                created_data_pair, created_pair_name, created_data_cause = return_cause_pair(create_i_pair, relation=relation, prefix=f'[{create_func_name}]')
 
-                    create_func_name = 'y=' + '+'.join(list(X_create)) + f'[s-{create_func_seeds[create_i]}]'
+                created_data[create_func_name] = {"files_pair": dict(zip(created_pair_name, created_data_pair)),
+                                                  "files_cause": dict(zip(created_pair_name, created_data_cause)),
+                                                  "R_true": dict(zip(created_pair_name, [create_R_true]*len(created_pair_name))),
+                                                  "X_name":dict(zip(created_pair_name, x_picked_create*x_times)),
+                                                  'description':'y=' + '+'.join(list(X_create)),
+                                                  "X":create_i_use, "y":y_obs_create}
 
-                    if use_x_piked:
+                count_0 = created_data_cause.count(0)
+                count_1 = created_data_cause.count(1)
 
-                        create_i_use = x_create.copy()[x_picked_create]
+                total_0 += count_0
+                total_1 += count_1
+                total_file += len(created_data_pair)
 
-                    else:
-                        create_i_use = x_create.copy()
+        # 7-4-2 模拟数据存入全局变量: use_files_dict -----------------------------------------------------------------------
 
-                    create_i_use["y"] = y_obs_create
-                    created_data_pair, created_pair_name, created_data_cause = return_cause_pair(create_i_use, prefix=f'[{create_func_name}]')
+        use_files_dict = created_data.copy()
+        st.session_state[f'{block_id}_use_files_dict'] = use_files_dict
 
-                    created_data[create_func_name] = {"files_pair": dict(zip(created_pair_name, created_data_pair)),
-                                                      "files_cause": dict(zip(created_pair_name, created_data_cause)),
-                                                      "R_true": dict(zip(created_pair_name, [create_R_true]*len(created_pair_name))),
-                                                      "X_name":dict(zip(created_pair_name, x_picked_create)),
-                                                      'description':'y=' + '+'.join(list(X_create)),}
+        with create_exe_expander_2:
 
-                    count_0 = created_data_cause.count(0)
-                    count_1 = created_data_cause.count(1)
+            st.success(f'已推送 {len(use_files_dict)} 个函数到项目')
 
-                    total_0 += count_0
-                    total_1 += count_1
-                    total_file += len(created_data_pair)
+            # 7-5-5 打印样本的 X 与 y -------------------------------------------------------------------------------------
 
-            # 7-4-2 模拟数据存入全局变量: use_files_dict -----------------------------------------------------------------------
+            # 7-5-6 打印模拟样本的生成参数 与 参数符合度的检测结果 --------------------------------------------------------------
 
-            use_files_dict = created_data.copy()
-            st.session_state[f'{block_id}_use_files_dict'] = use_files_dict
-
-            with create_exe_expander_2:
-
-                st.success(f'已推送 {len(use_files_dict)} 个函数到项目')
-
-            # 7-5-5 打印样本的 X 与 y -----------------------------------------------------------------------------------------
-
-            # 7-5-6 打印模拟样本的生成参数 与 参数符合度的检测结果 ------------------------------------------------------------------
-
-        # if output_create_button:
-        #
-        #     if DPLS_picked_attr:
-        #
-        #         all_files_dpls_values = []
-        #
-        #         for db_name, db_values in stqdm(use_files_dict.items()):
-        #
-        #             DPLS_obj_dict:dict = parallel_wrapper(cal_DPLS_obj, db_values["files_pair"], desc="cal_DPLS_obj", reason=0, result=1, thread=thread)
-        #             db_values['files_dpls_obj'] = DPLS_obj_dict
-        #             db_values['files_dpls_values'] = {key: {pick: dpls_obj.__dict__[pick] for pick in DPLS_picked_attr.keys()} for key, dpls_obj in db_values['files_dpls_obj'].items()}
-        #
-        #             db_files_dpls_values = pd.DataFrame.from_dict(db_values['files_dpls_values'], orient='index')
-        #
-        #             if "R2" in db_files_dpls_values.columns:
-        #
-        #                 R2_expanded = db_files_dpls_values['R2'].apply(lambda x: x[0])
-        #                 db_files_dpls_values = pd.concat([db_files_dpls_values.drop(columns=["R2"]), R2_expanded], axis=1)
-        #
-        #             if "p" in db_files_dpls_values.columns:
-        #
-        #                 p_expanded = db_files_dpls_values['p'].apply(lambda x: x[0])
-        #                 db_files_dpls_values = pd.concat([db_files_dpls_values.drop(columns=['p']), p_expanded], axis=1)
-        #
-        #             if 'y_pred_R2' in db_files_dpls_values.columns:
-        #                 y_pred_R2_expanded = db_files_dpls_values['y_pred_R2'].apply(lambda x: x[0])
-        #                 y_pred_R2_expanded =  y_pred_R2_expanded.apply(pd.Series)
-        #                 y_pred_R2_expanded.columns = [f"r2_p{i}" for i in range(y_pred_R2_expanded.shape[1])]
-        #                 db_files_dpls_values = pd.concat([db_files_dpls_values.drop(columns=["y_pred_R2"]), y_pred_R2_expanded], axis=1)
-        #
-        #             db_files_dpls_values["R_true"] = pd.Series(db_values["R_true"])
-        #
-        #             db_values['files_dpls_values'] = db_files_dpls_values
-        #             all_files_dpls_values.append(db_files_dpls_values)
-        #
-        #         all_files_dpls_values = pd.concat(all_files_dpls_values, axis=0)
-        #         st.dataframe(all_files_dpls_values)
-        #
-        #         csv = all_files_dpls_values.to_csv().encode('utf-8')
-        #         # 添加下载按钮
-        #         download_create_button = st.download_button(
-        #             label="📥 下载",
-        #             data=csv,
-        #             file_name=f'create_{test_files_num}_data.csv',
-        #             mime='text/csv',
-        #             use_container_width=True, key=f"{block_id}_download_create_button"
-        #         )
-        #
-        #     else:
-        #         pass
-        # if check_file_button or use_files_dict:
-        #
-        #     st.markdown("")
-        #     st.markdown("")
-        #     st.markdown("<h3 style='text-align: center;'>文件检视面板</h3>", unsafe_allow_html=True)
-        #     st.markdown("")
-        #     st.markdown("---")
-        #
-        #     expand_raw_now_files(use_files_dict, total_file=total_file, expand=True, print_pred=True, thread=thread)
 
     hr_second(dark_color="#244690", height=2.5, light_color="#26519d")
 
-    file_param = {
+    file_param.update({
 
         "illegal_compatible_mode": illegal_compatible_mode,
         'test_files_num': test_files_num,
@@ -1305,7 +1219,10 @@ def simplify_data_module(block_id, thread=1):
         "create_linear_limit": create_linear_limit,
         "gen_floor": gen_floor
 
-    }
+
+    })
+
+    file_param.update(create_kwargs)
 
     return use_files_dict, file_param
 
@@ -1326,4 +1243,4 @@ def simplify_data_module(block_id, thread=1):
 
 if __name__ == '__main__':
 
-    simplify_data_module("test")
+    create_data("test")

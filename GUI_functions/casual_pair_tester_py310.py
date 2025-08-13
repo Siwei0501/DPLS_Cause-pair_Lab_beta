@@ -13,15 +13,15 @@ from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.gaussian_process.kernels import Matern
 from tqdm import tqdm
 
-from cause_pair_functions import test_tools_v312
-from cause_pair_functions.DPLS_jj import DPLS
+from GUI_functions import test_tools_v312
+from GUI_functions.DPLS_jj import DPLS
 
 Pre_process_Option = Literal[
     'Xmean', 'None', 'add_noise', 'drop_duplicates_mean', 'to_DPLS_pred', 'subsidiary_sampling', 'normalize', 'regionalitze']
 Pre_process_Iterable = Union[Pre_process_Option, Iterable[Pre_process_Option]]
 
 Method_Option = Literal[
-    'DPLSR','DPLS', 'P_DPLSR', 'MIDC', 'DPLSe_KCI', 'DPLSe_P_KCI', 'DPLSe_HSIC',
+    'DPLSR', 'DPLS', 'P_DPLSR', 'MIDC', 'DPLSe_KCI', 'DPLSe_P_KCI', 'DPLSe_HSIC',
     'PATH', 'Sum', 'PersonR', 'is_Linear', 'GS', '','CV', "Sort_by_reason",
     'DPLS_predR', 'break_DPLSR', 'CMVe_DPLSR', 'aCMV_DPLSe_KCI', 'chain_stability', 'CMVe_DPLSe_KCI', 'PATH_tender', 'shuffle_path']
 
@@ -128,6 +128,10 @@ def cal_DPLS_obj(file_value:pd.DataFrame, **kwargs):
 
             needed_param.extend(DPLS_obj.__dict__['y_pred_R2'][0])
 
+        elif param == 'max_iter':
+
+            needed_param.append(DPLS_obj.__dict__['max_iter'])
+
         else:
             needed_param.extend(DPLS_obj.__dict__[param])
 
@@ -211,7 +215,7 @@ def cal_chain_stability(file_value: pd.DataFrame, Chain_mode:Literal['flow', 'tr
 
 def cal_CMV(file_value: pd.DataFrame, CMV_mode: Literal['distance', 'origin'] = 'distance', CMV_num: int = 1, **kwargs):
     from sklearn.decomposition import PCA
-    from cause_pair_functions.DPLS_Direct import DPLS_distance
+    from GUI_functions.DPLS_Direct import DPLS_distance
 
     value_copy = test_tools_v312.stdize(file_value.copy())
     value_copy = value_copy.dropna(axis=0, how='any')
@@ -921,7 +925,8 @@ process = {
             "Sort_by_reason":Sort_by_reason
            }
 
-algorithms = {'DPLSR': cal_DPLSR,
+algorithms = {'DPLS': cal_DPLS_obj,
+              'DPLSR': cal_DPLSR,
               'PATH': cal_path,
               'PersonR': cal_PersonR,
               'CV': cal_CV,

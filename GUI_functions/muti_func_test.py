@@ -5,7 +5,7 @@ from typing import Tuple
 
 import numpy as np
 import pandas as pd
-from custom_html_module import *
+from GUI_modules.custom_GUI_module import *
 
 
 def gen_x(sample_num:int=500, param_num:int=2, x_start=-1, x_end=1, x_mode:Literal['uniform', 'grow', 'parabola']='uniform', x_seed=None, **kwargs) -> pd.DataFrame:

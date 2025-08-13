@@ -1,6 +1,6 @@
 import os
 
-from cause_pair_functions.casual_pair_tester import return_Cause_DF, Pre_process_Iterable, Method_Option
+from GUI_functions.casual_pair_tester import return_Cause_DF, Pre_process_Iterable, Method_Option
 from pair_data_presenter import return_cause_pair
 from typing import Literal
 import random

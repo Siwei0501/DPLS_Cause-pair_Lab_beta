@@ -7,10 +7,10 @@ from joblib import Parallel, delayed
 from sklearn.cross_decomposition import PLSRegression
 from tqdm import tqdm
 
-from cause_pair_functions import test_tools_v312
-from cause_pair_functions.DPLS_Direct import DPLS_distance, DPLS_distance_divider, sum_P
-from cause_pair_functions.Pow_method_PLSR import PLS_R
-from cause_pair_functions.test_tools_v312 import spliter
+from GUI_functions import test_tools_v312
+from GUI_functions.DPLS_Direct import DPLS_distance, DPLS_distance_divider, sum_P
+from GUI_functions.Pow_method_PLSR import PLS_R
+from GUI_functions.test_tools_v312 import spliter
 
 Distance_Option = Literal['Mah', 'Euc', 'Pairs', 'Ming', 'origin']
 Distance_Option_Iterable = Union[Distance_Option, Iterable[Distance_Option]]
@@ -618,7 +618,7 @@ class DPLS:
 
 if __name__ == '__main__':
 
-    from cause_pair_functions.muti_func_test import gen_y_exp, add_noise
+    from GUI_functions.muti_func_test import gen_y_exp, add_noise
     from matplotlib import pyplot as plt
 
     for i in range(5):

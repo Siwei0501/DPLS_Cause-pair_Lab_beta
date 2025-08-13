@@ -7,6 +7,10 @@ airfoil_file = pd.read_csv(rf'{base_dir}/winequality-red.csv', sep=";", header=0
 
 from typing import Literal, Tuple
 def return_cause_pair(relation: Literal["AB", "BA", "AB&BA"] = "AB", **kwargs):
+
+    X = airfoil_file.iloc[:, :-1]
+    y = airfoil_file.iloc[:, [-1]]
+
     if relation == "AB&BA":
 
         relation = ["AB", "BA"]
@@ -49,7 +53,7 @@ def return_cause_pair(relation: Literal["AB", "BA", "AB&BA"] = "AB", **kwargs):
         else:
             pair_cause.extend([0] * len(data_in_pair))
 
-    return pair_data, pair_name, pair_cause
+    return pair_data, pair_name, pair_cause, X, y
 
 
 if __name__ == '__main__':

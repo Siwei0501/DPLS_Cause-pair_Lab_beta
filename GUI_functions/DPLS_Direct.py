@@ -7,9 +7,9 @@ from joblib import Parallel, delayed
 from sklearn.decomposition import PCA
 from tqdm import tqdm
 
-from cause_pair_functions import test_tools_v312
-from cause_pair_functions.Pow_method_PLSR import PLS_R
-from cause_pair_functions.test_tools_v312 import spliter, distance_matrix
+from GUI_functions import test_tools_v312
+from GUI_functions.Pow_method_PLSR import PLS_R
+from GUI_functions.test_tools_v312 import spliter, distance_matrix
 
 Distance_Option = Literal['Mah', 'Euc', 'Pairs', 'Pairs_T', 'Ming', 'origin']
 Distance_Option_Iterable = Union[Distance_Option, Iterable[Distance_Option]]

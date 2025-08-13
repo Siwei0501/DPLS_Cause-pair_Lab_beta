@@ -9,6 +9,9 @@ import pandas as pd
 
 def return_cause_pair(relation: Literal['AB', 'BA', 'AB&BA'], threshold: list, test_SAMPLE: int = 200, seed=5, **kwargs):
 
+    X = None
+    y = None
+
     np.random.seed(seed)
     random.seed(seed)
 
@@ -101,10 +104,10 @@ def return_cause_pair(relation: Literal['AB', 'BA', 'AB&BA'], threshold: list, t
         else:
             raise NotImplementedError
 
-    return sampled_files, sampled_files_name, y_of_files
+    return sampled_files, sampled_files_name, y_of_files, X, y
 
 
 if __name__ == '__main__':
 
-    read_files, file_names, file_ys = return_cause_pair(relation='AB&BA', threshold=[0,10000], test_SAMPLE=50, seed=5)
+    read_files = return_cause_pair(relation='AB&BA', threshold=[0,10000], test_SAMPLE=50, seed=5)
     a=1
