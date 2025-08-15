@@ -9,4 +9,4 @@ RUN pip install --upgrade pip \
  && pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 
 EXPOSE 8501
-CMD ["streamlit", "run", "app/Cause_GUI.py", "--server.port=8501", "--server.address=0.0.0.0"]
+CMD ["streamlit", "run", "app/DPLS_Lab.py", "--server.port=8501", "--server.address=0.0.0.0"]

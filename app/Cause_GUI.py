@@ -13,10 +13,17 @@ from sklearn.model_selection import GridSearchCV
 # 导入自定义模块
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from GUI_functions.casual_pair_tester import process, algorithms, return_values_DF
-from GUI_modules.custom_GUI_module import *
+from DPLS_GUI import *
 from GUI_modules.create_data_module import create_data
 
 # 0 设置与定义------------------------------------------------------------------------------------------------------------
+
+if st.session_state.get('rerun', False):
+    pass
+else:
+    st.session_state['rerun'] = True
+    print('rerun')
+    st.rerun()
 
 st.markdown("""
 <style>
@@ -48,9 +55,10 @@ local_data_dir = os.path.join(script_dir, 'Cause_DBs')
 #项目路径
 project_dir = os.path.join(script_dir, 'config_file')
 #版本号
-now_version = "beta4"
+now_version = "beta7"
 #全局变量字典
 page_param_dict = {}
+
 # 全局功能函数定义区 -------------------------------------------------------------------------------------------------------
 
 
@@ -60,7 +68,7 @@ page_param_dict = {}
 
 
 # 网页名字
-st.set_page_config(page_title="DPLS Cause-pair Lab", layout="wide")
+st.set_page_config(page_title="DPLS Cause-pair Lab", layout="wide", page_icon='🔵')
 
 # 网页主标题及 Cause 动画
 st.markdown("""
@@ -136,35 +144,6 @@ with title_bar:
 with title_name:
     st.markdown(title_html, unsafe_allow_html=True)
 
-
-def parallel_wrapper(
-        func: Callable,
-        file_value_dict: dict,
-        desc: str,
-        thread: int = 1,
-        **kwargs
-
-) -> dict:
-
-    global title_bar_progress
-
-    return_dict = {}
-
-    if thread == 1:
-
-        for file_name, file_value in stqdm(file_value_dict.items(), desc=desc):
-            file_return = func(file_value, **kwargs)
-            return_dict[file_name] = file_return
-
-    else:
-
-        file_name_list = list(file_value_dict.keys())
-        thread_result = Parallel(n_jobs=thread)(delayed(func)(file_value_dict[key], **kwargs) for key in file_name_list)
-
-        for key, value in zip(file_name_list, thread_result):
-            return_dict.update({key: value})
-
-    return return_dict
 
 
 # 0-2-1 自定义渐变线 ------------------------------------------------------------------------------------------------------

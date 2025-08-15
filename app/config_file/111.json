@@ -1,0 +1,146 @@
+{
+    "Cause_GUI_create_redun_seed": 73,
+    "DPLSR_R_mode_Cause_GUI": "fusion",
+    "Cause_GUI_print_obs": false,
+    "Cause_GUI_create_funcseed": 75,
+    "Cause_GUI_create_x_bank": [
+        "线性函数",
+        "正弦函数",
+        "二次函数"
+    ],
+    "use_data_type": "模拟样本",
+    "now_project_name": "111",
+    "Cause_GUI_create_thresh_range": [
+        300,
+        700
+    ],
+    "Cause_GUI_create_linear_limit": false,
+    "DPLSR_whiten_Cause_GUI": false,
+    "Cause_GUI_create_define": [
+        -1.0,
+        1.0
+    ],
+    "Cause_GUI_add_xtox": false,
+    "Cause_GUI_create_redun_slope": 2.5,
+    "Cause_GUI_create_eg_kwargs": {
+        "param_num": 2,
+        "use_x_num": 2,
+        "x_num": 2,
+        "x_to_x_num": 3,
+        "x_to_x_level": 3,
+        "redundancy": false,
+        "redun_ratio": 2.5,
+        "func_seed": 75,
+        "x_seed": 410,
+        "linear_coef_range": [
+            -3,
+            3
+        ],
+        "linear_intercept_range": [
+            -5,
+            5
+        ],
+        "x_start": -1.0,
+        "x_end": 1.0,
+        "linear": false,
+        "use_x_func": [
+            "线性函数",
+            "正弦函数",
+            "二次函数"
+        ],
+        "use_xtox_func": [
+            "积函数",
+            "绝对值和函数",
+            "正弦和函数"
+        ],
+        "redun_seed": 73,
+        "x_mode": "uniform",
+        "redun_max_count": 5
+    },
+    "Cause_GUI_create_x_num": 2,
+    "Cause_GUI_formular_refresh": false,
+    "DPLSR_cv_Cause_GUI": 5,
+    "DPLSR_fit_intercept_Cause_GUI": false,
+    "classify_selection": [],
+    "Cause_GUI_create_redun_count": 5,
+    "Cause_GUI_illegal_compatible_mode": true,
+    "Cause_GUI_create_xseed": 410,
+    "Cause_GUI_create_noise": [
+        0.05,
+        0.5
+    ],
+    "preprocess_selection": [],
+    "Cause_GUI_minus_x": false,
+    "Cause_GUI_create_linear_intercept_range": [
+        -5,
+        5
+    ],
+    "classify_cv": 5,
+    "cv_mode": "uniform",
+    "Cause_GUI_test_files_num": 10,
+    "Cause_GUI_create_linear_coef_range": [
+        -3,
+        3
+    ],
+    "DPLSR_square_Cause_GUI": true,
+    "Cause_GUI_thresh_range": [
+        100,
+        1500
+    ],
+    "Cause_GUI_minus_xtox": false,
+    "illegal_compatible_mode": true,
+    "Cause_GUI_seed_value": 42,
+    "Cause_GUI_create_xtox_level": 3,
+    "Cause_GUI_enforce_P": -1,
+    "Cause_GUI_create_xtox_bank": [
+        "积函数",
+        "绝对值和函数",
+        "正弦和函数"
+    ],
+    "classify_shuffle_seed": 42,
+    "Thread": 1,
+    "DPLSR_max_iter_Cause_GUI": 20,
+    "create_seed_value": 42,
+    "Cause_GUI_create_use_x_num": 2,
+    "Cause_GUI_formular_eg_name": "",
+    "Cause_GUI_add_x": false,
+    "classify_shuffle_confirm": false,
+    "Cause_GUI_relation": "AB&BA",
+    "Cause_GUI_x_picked_eg": [
+        "x_1",
+        "x_2"
+    ],
+    "DPLSR_fit_mode_Cause_GUI": "Fit_rectify",
+    "Cause_GUI_create_redun": false,
+    "create_database_selections": [],
+    "DPLSR_distance_pattern_Cause_GUI": [
+        "Euc"
+    ],
+    "create_test_files_num": 10,
+    "Cause_GUI_create_param_num": 0,
+    "Cause_GUI_use_x_piked": true,
+    "Cause_GUI_create_xtox_num": 3,
+    "methods_direction": "AB&BA",
+    "Cause_GUI_dpls_kwargs": {
+        "DPLSR": {
+            "cv": 5,
+            "max_iter": 20,
+            "R_mode": "fusion",
+            "fit_mode": "Fit_rectify",
+            "distance_pattern": [
+                "Euc"
+            ],
+            "fit_intercept": false,
+            "whiten": false,
+            "square": true
+        },
+        "create_plot_noise": 0.5
+    },
+    "Cause_GUI_print_exp": true,
+    "Cause_GUI_create_plot_noise": 0.5,
+    "Cause_GUI_create_x_mode": "均匀",
+    "Cause_GUI_gen_floor": 1,
+    "create_method_selection": [],
+    "input_project_name": "111",
+    "Version": "beta4"
+}
